@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!129 &1
+PlayerSettings:
+  productName: PicoImageViewer
+  companyName: PicoImageViewer
+  defaultInterfaceOrientation: 4
+  AndroidMinSdkVersion: 29
+  AndroidTargetSdkVersion: 32
+  androidTargetDevices: 0
+  graphicsJobs: 1
+  colorSpace: 1
+  virtualRealitySupported: 1
+  scriptingBackend: 1
+  il2CppCompilerConfiguration: 2
+  apiCompatibilityLevel: 3
+  activeInputHandler: 2
+  buildNumber:
+    Standalone: 0
+    Android: 1
+  overrideDefaultApplicationIdentifier: 1
+  applicationIdentifier:
+    Android: com.picoimageviewer.xr
+  enableNativePlatformBackendsForNewInputSystem: 1
+  disableOldInputManagerSupport: 0
