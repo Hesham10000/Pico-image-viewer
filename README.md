@@ -70,7 +70,40 @@ Grid mode spawns **5 draggable, resizable windows**:
 git clone <repo-url>
 ```
 
-Open the project folder in Unity 6.3 LTS+. Unity will import packages from `Packages/manifest.json`.
+Open the project folder in Unity 6.3+. Unity will import packages from `Packages/manifest.json`.
+Gemini said
+Here is the step-by-step guide to setting up Unity on Linux and configuring your project with the Pico XR SDK.
+
+**Part 1: Install Unity on Linux**
+The best way to run Unity on Linux (Ubuntu/Debian-based) is to install the Unity Hub via the official repository. This ensures you get updates and can easily manage different Editor versions.
+
+**1. Install Unity Hub**
+   Open your terminal and run the following commands to add the Unity repository and install the Hub:
+
+```shell
+
+# 1. Add the public signing key
+wget -qO - https://hub.unity3d.com/linux/keys/public | gpg --dearmor | sudo tee /usr/share/keyrings/Unity_Technologies_ApS.gpg > /dev/null
+
+# 2. Add the Unity Hub repository to your sources
+sudo sh -c 'echo "deb [signed-by=/usr/share/keyrings/Unity_Technologies_ApS.gpg] https://hub.unity3d.com/linux/repos/deb stable main" > /etc/apt/sources.list.d/unityhub.list'
+
+# 3. Update package cache and install
+sudo apt update
+sudo apt install unityhub
+```
+**2. Install Unity Editor (6.3+)**
+   
+1. Open **Unity Hub.**
+2. Go to the Installs tab.
+
+3. Click **Install Editor.**
+
+4. Select the **6.3 LTS** version (or the specific version your project requires).
+
+5. **Important:** Under "Modules," ensure you check **Android Build Support**, **OpenJDK**, and **Android SDK & NDK Tools**. These are required for building to Pico headsets.
+
+
 
 ### 2. Install Pico XR SDK
 
@@ -282,7 +315,7 @@ This is edge-triggered with a configurable cooldown, so holding the joystick won
 ## Testing Checklist
 
 ### Setup
-- [ ] Project opens in Unity 2022.3+ without errors
+- [ ] Project opens in Unity 6.3+ without errors
 - [ ] Pico XR SDK is properly configured
 - [ ] Build produces a valid APK
 - [ ] APK installs and launches on Pico 4 Ultra

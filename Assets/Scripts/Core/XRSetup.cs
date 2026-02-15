@@ -62,7 +62,7 @@ namespace PicoImageViewer.Core
             if (_rayMaterial != null) lineRenderer.material = _rayMaterial;
 
             // Add XR Interactor Line Visual
-            var lineVisual = rayGO.AddComponent<XRInteractorLineVisual>();
+            var lineVisual = rayGO.AddComponent<UnityEngine.XR.Interaction.Toolkit.Interactors.Visuals.XRInteractorLineVisual>();
             lineVisual.lineLength = _rayMaxDistance;
             lineVisual.validColorGradient = CreateGradient(_validColor);
             lineVisual.invalidColorGradient = CreateGradient(_invalidColor);

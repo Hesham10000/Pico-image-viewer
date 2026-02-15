@@ -62,3 +62,7 @@ Thumbs.db
 .gradle/
 **/build/
 local.properties
+/Packages/PICO Unity Integration SDK-3.3.3-20251202/
+/Packages/Unity Live Preview Plugin-1.0.5-20250211/
+/unity-errors.log
+/unity-full-errors.log
