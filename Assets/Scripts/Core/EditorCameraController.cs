@@ -19,13 +19,29 @@ namespace PicoImageViewer.Core
 
         private float _rotationX;
         private float _rotationY;
+        private Transform _moveTarget; // the transform we actually move
 
         private void Start()
         {
-            // Position camera at a good starting point to see the UI panels
+            // Move the XR Rig root (or Camera Offset parent) so the whole rig is positioned correctly.
+            // This avoids conflicts with XR Rig hierarchy expectations.
+            // Walk up to find the XR Rig root.
+            _moveTarget = transform;
+            var xrRig = transform.parent;
+            while (xrRig != null)
+            {
+                if (xrRig.name == "XR Rig")
+                {
+                    _moveTarget = xrRig;
+                    break;
+                }
+                xrRig = xrRig.parent;
+            }
+
+            // Position at a good starting point to see the UI panels
             // Panels are at: SettingsPanel (-1.5, 1.2, 1.5) and FolderBrowser (1.0, 1.2, 1.5)
-            transform.position = new Vector3(0f, 1.2f, 0f);
-            transform.rotation = Quaternion.Euler(0, 0, 0);
+            _moveTarget.position = new Vector3(0f, 1.2f, 0f);
+            transform.localRotation = Quaternion.Euler(0, 0, 0);
 
             _rotationX = 0;
             _rotationY = 0;
@@ -39,7 +55,12 @@ namespace PicoImageViewer.Core
                 Debug.Log("[EditorCamera] Created EventSystem for UI interaction");
             }
 
-            Debug.Log("[EditorCamera] Editor camera active. WASD=move, RightClick+Mouse=look, Scroll=zoom");
+            Debug.Log("[EditorCamera] Editor camera active. Controls:\n" +
+                       "  WASD = move, Q/E = down/up\n" +
+                       "  Right-click + Mouse = look around\n" +
+                       "  Shift = move faster\n" +
+                       "  Scroll = zoom\n" +
+                       "  Left-click = interact with UI panels");
         }
 
         private void Update()
@@ -83,7 +104,7 @@ namespace PicoImageViewer.Core
                 move += transform.forward * scroll * _scrollSpeed;
             }
 
-            transform.position += move * speed;
+            _moveTarget.position += move * speed;
         }
 #endif
     }
