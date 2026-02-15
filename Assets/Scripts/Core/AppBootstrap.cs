@@ -1,7 +1,10 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 using PicoImageViewer.Android;
 using PicoImageViewer.Data;
 using PicoImageViewer.UI;
+using UnityEngine.XR.Interaction.Toolkit.UI;
 
 namespace PicoImageViewer.Core
 {
@@ -12,6 +15,8 @@ namespace PicoImageViewer.Core
     /// </summary>
     public class AppBootstrap : MonoBehaviour
     {
+        public static AppBootstrap Instance { get; private set; }
+
         [Header("XR References")]
         [SerializeField] private Transform _xrRig;
         [SerializeField] private Transform _headCamera;
@@ -28,8 +33,15 @@ namespace PicoImageViewer.Core
         [SerializeField] private SettingsPanel _settingsPanel;
         [SerializeField] private FolderBrowserPanel _folderBrowserPanel;
 
+        [Header("Panel Placement")]
+        [SerializeField] private float _panelDistance = 1.5f;
+        [SerializeField] private float _panelVerticalOffset = -0.05f;
+
+        private bool _initialized;
+
         private void Awake()
         {
+            Instance = this;
             Application.targetFrameRate = 72; // Pico 4 Ultra default
             QualitySettings.vSyncCount = 0;
         }
@@ -38,6 +50,13 @@ namespace PicoImageViewer.Core
         {
             // Auto-discover references if not assigned in Inspector
             AutoDiscoverReferences();
+
+            EnsureXrUiRuntime();
+            if (RuntimeDebugOverlay.Instance == null)
+            {
+                var debugOverlay = new GameObject("RuntimeDebugOverlay");
+                debugOverlay.AddComponent<RuntimeDebugOverlay>();
+            }
 
             // Wire up head transform to managers
             if (_headCamera != null)
@@ -59,8 +78,33 @@ namespace PicoImageViewer.Core
                 _windowManager.OnModeChanged += OnModeChanged;
             }
 
+            RecenterUI();
+
             // Request permissions then proceed
             RequestPermissionsAndInit();
+        }
+
+        private void EnsureXrUiRuntime()
+        {
+            if (FindAnyObjectByType<EventSystem>() == null)
+            {
+                var eventSystemGo = new GameObject("EventSystem");
+                eventSystemGo.AddComponent<EventSystem>();
+                eventSystemGo.AddComponent<InputSystemUIInputModule>();
+                Debug.Log("[AppBootstrap] Created EventSystem + InputSystemUIInputModule");
+            }
+
+            var canvases = FindObjectsByType<Canvas>(FindObjectsSortMode.None);
+            foreach (var canvas in canvases)
+            {
+                if (canvas.renderMode == RenderMode.WorldSpace &&
+                    canvas.GetComponent<TrackedDeviceGraphicRaycaster>() == null)
+                {
+                    canvas.gameObject.AddComponent<TrackedDeviceGraphicRaycaster>();
+                }
+            }
+
+            Debug.Log($"[AppBootstrap] XR UI setup complete (world canvases: {canvases.Length})");
         }
 
         /// <summary>
@@ -127,25 +171,51 @@ namespace PicoImageViewer.Core
 
             _androidPermissions.RequestStoragePermissions(granted =>
             {
-                if (granted)
-                {
-                    Debug.Log("[AppBootstrap] Storage permission granted");
-                    InitializeApp();
-                }
-                else
-                {
-                    Debug.LogWarning("[AppBootstrap] Storage permission denied. " +
-                                     "User must grant permission to browse files.");
-                    InitializeApp();
-                }
+                HandlePermissionResult(granted);
             });
 #else
             InitializeApp();
 #endif
         }
 
+        public void RequestStoragePermissionFromUI()
+        {
+            if (_androidPermissions == null)
+                _androidPermissions = FindAnyObjectByType<AndroidPermissions>();
+
+            if (_androidPermissions == null)
+                return;
+
+            _folderBrowserPanel?.SetPermissionState(false, "Requesting storage permission...");
+            _androidPermissions.RequestStoragePermissions(HandlePermissionResult);
+        }
+
+        private void HandlePermissionResult(bool granted)
+        {
+            if (granted)
+            {
+                Debug.Log("[AppBootstrap] Storage permission granted");
+                RuntimeDebugOverlay.Instance?.Log("Permission: granted");
+                _folderBrowserPanel?.SetPermissionState(true, "Permission granted");
+                RecenterUI();
+                InitializeApp();
+            }
+            else
+            {
+                Debug.LogWarning("[AppBootstrap] Storage permission denied");
+                RuntimeDebugOverlay.Instance?.Log("Permission: denied");
+                _folderBrowserPanel?.SetPermissionState(false,
+                    "Storage permission needed. Use 'Grant Access' and allow Photos/Files.");
+                InitializeApp();
+            }
+        }
+
         private void InitializeApp()
         {
+            if (_initialized)
+                return;
+            _initialized = true;
+
             var settings = AppSettings.Load();
 
             // Apply initial mode UI state
@@ -159,6 +229,38 @@ namespace PicoImageViewer.Core
             // In Normal mode, the FolderBrowserPanel handles its own initialization
 
             Debug.Log($"[AppBootstrap] Initialization complete (mode: {settings.Mode})");
+        }
+
+        public void RecenterUI()
+        {
+            if (_headCamera == null)
+                _headCamera = Camera.main?.transform;
+            if (_headCamera == null)
+                return;
+
+            var forward = _headCamera.forward;
+            forward.y = 0f;
+            if (forward.sqrMagnitude < 0.01f)
+                forward = Vector3.forward;
+            forward.Normalize();
+
+            PlacePanelInFront(_folderBrowserPanel != null ? _folderBrowserPanel.transform as RectTransform : null, forward, 0f);
+            PlacePanelInFront(_settingsPanel != null ? _settingsPanel.transform as RectTransform : null, forward, -0.45f);
+            var msg = $"Recenter UI @ {_headCamera.position}";
+            Debug.Log($"[AppBootstrap] {msg}");
+            RuntimeDebugOverlay.Instance?.Log(msg);
+        }
+
+        private void PlacePanelInFront(RectTransform panel, Vector3 forward, float horizontalOffset)
+        {
+            if (panel == null) return;
+
+            var right = Vector3.Cross(Vector3.up, forward).normalized;
+            Vector3 target = _headCamera.position + forward * _panelDistance + right * horizontalOffset;
+            target.y = _headCamera.position.y + _panelVerticalOffset;
+
+            panel.position = target;
+            panel.rotation = Quaternion.LookRotation(panel.position - _headCamera.position, Vector3.up);
         }
 
         /// <summary>
@@ -178,6 +280,9 @@ namespace PicoImageViewer.Core
         {
             if (_windowManager != null)
                 _windowManager.OnModeChanged -= OnModeChanged;
+
+            if (Instance == this)
+                Instance = null;
         }
     }
 }
