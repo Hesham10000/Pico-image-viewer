@@ -12,7 +12,7 @@ PlayerSettings:
   targetDevice: 2
   useOnDemandResources: 0
   accelerometerFrequency: 60
-  companyName: PicoImageViewer
+  companyName: Xleven
   productName: PicoImageViewer
   defaultCursor: {fileID: 0}
   cursorHotspot: {x: 0, y: 0}
@@ -168,7 +168,7 @@ PlayerSettings:
   androidMaxAspectRatio: 2.4
   androidMinAspectRatio: 1
   applicationIdentifier:
-    Android: 
+    Android: Xleven.PicoImageViewer
     Standalone: unity.PicoImageViewer.PicoImageViewer
     VisionOS: 
     iPhone: 
