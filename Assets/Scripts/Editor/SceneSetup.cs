@@ -18,8 +18,9 @@ namespace PicoImageViewer.Editor
             // Remove any existing default "Main Camera" that's not part of XR Rig
             RemoveDefaultCamera();
 
-            // Create XR Rig placeholder
+            // Create XR Rig placeholder — position at eye level so panels are visible
             var xrRig = FindOrCreate("XR Rig");
+            xrRig.transform.position = new Vector3(0f, 1.2f, 0f);
             var cameraOffset = FindOrCreateChild(xrRig, "Camera Offset");
             var mainCamera = FindOrCreateChild(cameraOffset, "Main Camera");
             if (mainCamera.GetComponent<Camera>() == null)
