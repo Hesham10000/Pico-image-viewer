@@ -5,14 +5,25 @@ using UnityEngine;
 namespace PicoImageViewer.Android
 {
     /// <summary>
-    /// Handles Android runtime permission requests for file access on Pico devices.
-    /// Supports both legacy WRITE_EXTERNAL_STORAGE and API 30+ MANAGE_EXTERNAL_STORAGE.
+    /// Handles Android runtime permission requests for image/file access on Pico devices.
+    /// Uses READ_MEDIA_IMAGES on Android 13+ and falls back to legacy storage permissions.
     /// </summary>
     public class AndroidPermissions : MonoBehaviour
     {
         public static AndroidPermissions Instance { get; private set; }
 
         public Action<bool> OnPermissionResult;
+
+        public enum PermissionState
+        {
+            Unknown,
+            Checking,
+            Requesting,
+            Granted,
+            Denied
+        }
+
+        public PermissionState CurrentState { get; private set; } = PermissionState.Unknown;
 
         private void Awake()
         {
@@ -24,16 +35,13 @@ namespace PicoImageViewer.Android
             Instance = this;
         }
 
-        /// <summary>
-        /// Check and request storage permissions. Calls onResult(true) if granted.
-        /// </summary>
         public void RequestStoragePermissions(Action<bool> onResult)
         {
             OnPermissionResult = onResult;
-
 #if UNITY_ANDROID && !UNITY_EDITOR
             StartCoroutine(RequestPermissionsCoroutine());
 #else
+            SetState(PermissionState.Granted);
             onResult?.Invoke(true);
 #endif
         }
@@ -41,73 +49,100 @@ namespace PicoImageViewer.Android
 #if UNITY_ANDROID && !UNITY_EDITOR
         private IEnumerator RequestPermissionsCoroutine()
         {
-            // Check if we already have permissions
+            SetState(PermissionState.Checking);
+
             if (HasStoragePermission())
             {
+                SetState(PermissionState.Granted);
                 OnPermissionResult?.Invoke(true);
                 yield break;
             }
 
-            // API 30+: need MANAGE_EXTERNAL_STORAGE
+            SetState(PermissionState.Requesting);
             int apiLevel = GetApiLevel();
-            if (apiLevel >= 30)
+            bool granted = false;
+
+            if (apiLevel >= 33)
             {
-                RequestManageExternalStorage();
-                // Wait a frame for the settings activity
-                yield return new WaitForSeconds(0.5f);
-
-                // We can't truly wait for the user to return from settings,
-                // so we check periodically
-                float timeout = 30f;
-                float elapsed = 0f;
-                while (elapsed < timeout && !HasStoragePermission())
-                {
-                    yield return new WaitForSeconds(1f);
-                    elapsed += 1f;
-                }
-
-                OnPermissionResult?.Invoke(HasStoragePermission());
+                yield return RequestRuntimePermission("android.permission.READ_MEDIA_IMAGES", v => granted = v);
             }
             else
             {
-                // API < 30: request READ/WRITE_EXTERNAL_STORAGE
-                if (!UnityEngine.Android.Permission.HasUserAuthorizedPermission(
-                        "android.permission.READ_EXTERNAL_STORAGE"))
+                yield return RequestRuntimePermission("android.permission.READ_EXTERNAL_STORAGE", v => granted = v);
+            }
+
+            if (!granted && apiLevel >= 30)
+            {
+                RequestManageExternalStorage();
+                yield return WaitForSettingsResult();
+                granted = HasStoragePermission();
+            }
+
+            SetState(granted ? PermissionState.Granted : PermissionState.Denied);
+            OnPermissionResult?.Invoke(granted);
+        }
+
+        private IEnumerator RequestRuntimePermission(string permission, Action<bool> onComplete)
+        {
+            if (UnityEngine.Android.Permission.HasUserAuthorizedPermission(permission))
+            {
+                onComplete?.Invoke(true);
+                yield break;
+            }
+
+            UnityEngine.Android.Permission.RequestUserPermission(permission);
+            float timeout = 8f;
+            while (timeout > 0f)
+            {
+                if (UnityEngine.Android.Permission.HasUserAuthorizedPermission(permission))
                 {
-                    UnityEngine.Android.Permission.RequestUserPermission(
-                        "android.permission.READ_EXTERNAL_STORAGE");
-                    yield return new WaitForSeconds(0.5f);
+                    onComplete?.Invoke(true);
+                    yield break;
                 }
 
-                if (!UnityEngine.Android.Permission.HasUserAuthorizedPermission(
-                        "android.permission.WRITE_EXTERNAL_STORAGE"))
-                {
-                    UnityEngine.Android.Permission.RequestUserPermission(
-                        "android.permission.WRITE_EXTERNAL_STORAGE");
-                    yield return new WaitForSeconds(0.5f);
-                }
+                timeout -= 0.25f;
+                yield return new WaitForSeconds(0.25f);
+            }
 
-                // Check result
-                bool granted = UnityEngine.Android.Permission.HasUserAuthorizedPermission(
-                    "android.permission.READ_EXTERNAL_STORAGE");
-                OnPermissionResult?.Invoke(granted);
+            onComplete?.Invoke(UnityEngine.Android.Permission.HasUserAuthorizedPermission(permission));
+        }
+
+        private IEnumerator WaitForSettingsResult()
+        {
+            float timeout = 30f;
+            while (timeout > 0f)
+            {
+                if (HasStoragePermission())
+                    yield break;
+
+                timeout -= 1f;
+                yield return new WaitForSeconds(1f);
             }
         }
 
-        private bool HasStoragePermission()
+        public bool HasStoragePermission()
         {
             int apiLevel = GetApiLevel();
+            if (apiLevel >= 33)
+            {
+                return UnityEngine.Android.Permission.HasUserAuthorizedPermission("android.permission.READ_MEDIA_IMAGES")
+                       || IsExternalStorageManager();
+            }
+
             if (apiLevel >= 30)
             {
-                using (var env = new AndroidJavaClass("android.os.Environment"))
-                {
-                    return env.CallStatic<bool>("isExternalStorageManager");
-                }
+                return IsExternalStorageManager()
+                       || UnityEngine.Android.Permission.HasUserAuthorizedPermission("android.permission.READ_EXTERNAL_STORAGE");
             }
-            else
+
+            return UnityEngine.Android.Permission.HasUserAuthorizedPermission("android.permission.READ_EXTERNAL_STORAGE");
+        }
+
+        private bool IsExternalStorageManager()
+        {
+            using (var env = new AndroidJavaClass("android.os.Environment"))
             {
-                return UnityEngine.Android.Permission.HasUserAuthorizedPermission(
-                    "android.permission.READ_EXTERNAL_STORAGE");
+                return env.CallStatic<bool>("isExternalStorageManager");
             }
         }
 
@@ -115,9 +150,7 @@ namespace PicoImageViewer.Android
         {
             try
             {
-                using (var activity = new AndroidJavaClass("com.unity3d.player.UnityPlayer")
-                           .GetStatic<AndroidJavaObject>("currentActivity"))
-                using (var settings = new AndroidJavaClass("android.provider.Settings"))
+                using (var activity = new AndroidJavaClass("com.unity3d.player.UnityPlayer").GetStatic<AndroidJavaObject>("currentActivity"))
                 {
                     string action = "android.settings.MANAGE_ALL_FILES_ACCESS_PERMISSION";
                     using (var intent = new AndroidJavaObject("android.content.Intent", action))
@@ -125,6 +158,7 @@ namespace PicoImageViewer.Android
                         activity.Call("startActivity", intent);
                     }
                 }
+                Debug.Log("[AndroidPermissions] Opened MANAGE_ALL_FILES_ACCESS settings");
             }
             catch (Exception ex)
             {
@@ -140,5 +174,11 @@ namespace PicoImageViewer.Android
             }
         }
 #endif
+
+        private void SetState(PermissionState state)
+        {
+            CurrentState = state;
+            Debug.Log($"[AndroidPermissions] State -> {state}");
+        }
     }
 }

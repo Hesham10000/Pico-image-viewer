@@ -28,6 +28,9 @@ namespace PicoImageViewer.UI
         [SerializeField] private ScrollRect _scrollRect;
         [SerializeField] private TextMeshProUGUI _statusText;
 
+        [Header("Runtime")]
+        [SerializeField] private bool _permissionGranted = true;
+
         [Header("Layout")]
         [SerializeField] private float _itemHeight = 50f;
         [SerializeField] private float _itemSpacing = 5f;
@@ -36,6 +39,8 @@ namespace PicoImageViewer.UI
         private string _currentPath;
         private readonly Stack<string> _navigationHistory = new Stack<string>();
         private readonly List<GameObject> _spawnedItems = new List<GameObject>();
+        private Button _recenterButton;
+        private Button _grantAccessButton;
 
         // Cached sibling images for the current folder (used by ImageWindow joystick nav)
         private List<ImageData> _currentFolderImages = new List<ImageData>();
@@ -67,6 +72,10 @@ namespace PicoImageViewer.UI
                 _backButton.onClick.AddListener(NavigateBack);
             if (_homeButton != null)
                 _homeButton.onClick.AddListener(NavigateHome);
+            if (_recenterButton != null)
+                _recenterButton.onClick.AddListener(() => PicoImageViewer.Core.AppBootstrap.Instance?.RecenterUI());
+            if (_grantAccessButton != null)
+                _grantAccessButton.onClick.AddListener(() => PicoImageViewer.Core.AppBootstrap.Instance?.RequestStoragePermissionFromUI());
 
             // Start at last browsed folder or root folder
             var settings = AppSettings.Load();
@@ -96,10 +105,17 @@ namespace PicoImageViewer.UI
             }
 #endif
 
-            if (Directory.Exists(startPath))
-                NavigateTo(startPath);
+            if (_permissionGranted)
+            {
+                if (Directory.Exists(startPath))
+                    NavigateTo(startPath);
+                else
+                    NavigateTo(GetDefaultStartPath());
+            }
             else
-                NavigateTo(GetDefaultStartPath());
+            {
+                UpdateStatus("Storage permission required.");
+            }
         }
 
         private string GetDefaultStartPath()
@@ -177,9 +193,23 @@ namespace PicoImageViewer.UI
                 if (go != null) _homeButton = go.GetComponent<Button>();
                 else _homeButton = CreateNavButton(header, "HomeButton", "Home", 2);
             }
+
+            if (_recenterButton == null)
+            {
+                var go = FindChildRecursive(header, "RecenterButton");
+                if (go != null) _recenterButton = go.GetComponent<Button>();
+                else _recenterButton = CreateNavButton(header, "RecenterButton", "Recenter UI", 3, 110f);
+            }
+
+            if (_grantAccessButton == null)
+            {
+                var go = FindChildRecursive(header, "GrantAccessButton");
+                if (go != null) _grantAccessButton = go.GetComponent<Button>();
+                else _grantAccessButton = CreateNavButton(header, "GrantAccessButton", "Grant Access", 4, 120f);
+            }
         }
 
-        private Button CreateNavButton(Transform parent, string name, string label, int index)
+        private Button CreateNavButton(Transform parent, string name, string label, int index, float btnWidth = 80f)
         {
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
@@ -188,7 +218,6 @@ namespace PicoImageViewer.UI
             rect.anchorMin = new Vector2(0, 0);
             rect.anchorMax = new Vector2(0, 0.5f);
             rect.pivot = new Vector2(0, 0.5f);
-            float btnWidth = 80f;
             float spacing = 5f;
             rect.anchoredPosition = new Vector2(10 + index * (btnWidth + spacing), 0);
             rect.sizeDelta = new Vector2(btnWidth, 30);
@@ -230,6 +259,12 @@ namespace PicoImageViewer.UI
         /// </summary>
         public void NavigateTo(string folderPath)
         {
+            if (!_permissionGranted)
+            {
+                UpdateStatus("Storage permission needed before browsing files.");
+                return;
+            }
+
             if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
             {
                 UpdateStatus($"Folder not found: {folderPath}");
@@ -546,11 +581,29 @@ namespace PicoImageViewer.UI
             gameObject.SetActive(visible);
         }
 
+        public void SetPermissionState(bool granted, string message)
+        {
+            _permissionGranted = granted;
+            if (_scrollRect != null)
+                _scrollRect.enabled = granted;
+
+            if (_grantAccessButton != null)
+                _grantAccessButton.gameObject.SetActive(!granted);
+
+            if (!string.IsNullOrEmpty(message))
+                UpdateStatus(message);
+
+            if (granted && string.IsNullOrEmpty(_currentPath))
+                NavigateTo(GetDefaultStartPath());
+        }
+
         private void OnDestroy()
         {
             if (_upButton != null) _upButton.onClick.RemoveAllListeners();
             if (_backButton != null) _backButton.onClick.RemoveAllListeners();
             if (_homeButton != null) _homeButton.onClick.RemoveAllListeners();
+            if (_recenterButton != null) _recenterButton.onClick.RemoveAllListeners();
+            if (_grantAccessButton != null) _grantAccessButton.onClick.RemoveAllListeners();
             ClearItems();
 
             if (Instance == this) Instance = null;
