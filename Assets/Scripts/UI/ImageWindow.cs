@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -43,6 +44,10 @@ namespace PicoImageViewer.UI
         private float _imageAspect = 1f;
         private bool _isTextureLoaded;
 
+        // Normal mode: sibling images in the same folder for joystick cycling
+        private List<ImageData> _siblingImages;
+        private int _currentSiblingIndex = -1;
+
         // Window sizing (in world-space meters, mapped to localScale)
         private float _currentWidth;
         private float _currentHeight;
@@ -53,6 +58,7 @@ namespace PicoImageViewer.UI
         public ImageData Data => _imageData;
         public string RelativePath => _imageData?.RelativePath;
         public bool IsHidden { get; private set; }
+        public List<ImageData> SiblingImages => _siblingImages;
 
         #region Initialization
 
@@ -285,12 +291,93 @@ namespace PicoImageViewer.UI
 
         #endregion
 
+        #region Normal Mode - Sibling Image Cycling
+
+        /// <summary>
+        /// Set the list of sibling images (same folder) for joystick cycling.
+        /// Called by NormalModeManager when spawning windows in Normal mode.
+        /// </summary>
+        public void SetSiblingImages(List<ImageData> siblings)
+        {
+            _siblingImages = siblings;
+            // Find current index
+            _currentSiblingIndex = -1;
+            if (_siblingImages != null && _imageData != null)
+            {
+                for (int i = 0; i < _siblingImages.Count; i++)
+                {
+                    if (_siblingImages[i].FullPath == _imageData.FullPath)
+                    {
+                        _currentSiblingIndex = i;
+                        break;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Cycle to the next image in the folder (joystick down).
+        /// Replaces the current image in this window.
+        /// </summary>
+        public void CycleToNextImage()
+        {
+            if (_siblingImages == null || _siblingImages.Count <= 1) return;
+
+            int nextIndex = _currentSiblingIndex + 1;
+            if (nextIndex >= _siblingImages.Count) nextIndex = 0; // wrap around
+            CycleToIndex(nextIndex);
+        }
+
+        /// <summary>
+        /// Cycle to the previous image in the folder (joystick up).
+        /// Replaces the current image in this window.
+        /// </summary>
+        public void CycleToPreviousImage()
+        {
+            if (_siblingImages == null || _siblingImages.Count <= 1) return;
+
+            int prevIndex = _currentSiblingIndex - 1;
+            if (prevIndex < 0) prevIndex = _siblingImages.Count - 1; // wrap around
+            CycleToIndex(prevIndex);
+        }
+
+        private void CycleToIndex(int index)
+        {
+            if (_siblingImages == null || index < 0 || index >= _siblingImages.Count) return;
+
+            _currentSiblingIndex = index;
+            var newImage = _siblingImages[index];
+
+            // Update data reference
+            _imageData = newImage;
+
+            // Update title
+            if (_titleText != null)
+                _titleText.text = newImage.FileName;
+            if (_folderLabel != null)
+                _folderLabel.text = newImage.FolderName;
+
+            // Show loading and load new texture
+            SetLoadingState(true);
+            _isTextureLoaded = false;
+
+            if (TextureLoader.Instance != null)
+            {
+                TextureLoader.Instance.LoadAsync(newImage.FullPath, OnTextureLoaded);
+            }
+        }
+
+        #endregion
+
         #region Visibility
 
         public void Hide()
         {
             IsHidden = true;
             gameObject.SetActive(false);
+
+            // Notify NormalModeManager if in normal mode
+            NormalModeManager.Instance?.UnregisterWindow(this);
         }
 
         public void Show()

@@ -31,14 +31,21 @@ namespace PicoImageViewer.Editor
             var windowMgrGO = CreateChild(managers, "WindowManager");
             windowMgrGO.AddComponent<Core.WindowManager>();
 
+            var normalMgrGO = CreateChild(managers, "NormalModeManager");
+            normalMgrGO.AddComponent<Core.NormalModeManager>();
+
             var texLoaderGO = CreateChild(managers, "TextureLoader");
             texLoaderGO.AddComponent<Core.TextureLoader>();
 
             var permissionsGO = CreateChild(managers, "AndroidPermissions");
             permissionsGO.AddComponent<Android.AndroidPermissions>();
 
-            // Window Container
+            // Window Container (shared by both modes)
             CreateChild(managers, "WindowContainer");
+
+            // Joystick Image Navigator (for normal mode image cycling)
+            var joystickNavGO = CreateChild(managers, "JoystickImageNavigator");
+            joystickNavGO.AddComponent<Interaction.JoystickImageNavigator>();
 
             // Create App Bootstrap
             var bootstrapGO = CreateGameObject("[AppBootstrap]");
@@ -46,6 +53,9 @@ namespace PicoImageViewer.Editor
 
             // Settings Panel (world-space canvas)
             CreateSettingsPanelPlaceholder();
+
+            // Folder Browser Panel (world-space, for Normal mode)
+            CreateFolderBrowserPlaceholder();
 
             // Create ImageWindow prefab placeholder
             CreateImageWindowPrefab();
@@ -231,6 +241,97 @@ namespace PicoImageViewer.Editor
             settingsRoot.transform.rotation = Quaternion.Euler(0, 30, 0);
 
             Debug.Log("[SceneSetup] Settings panel placeholder created.");
+        }
+
+        private static void CreateFolderBrowserPlaceholder()
+        {
+            var browserRoot = CreateGameObject("FolderBrowserPanel");
+            var canvas = browserRoot.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            browserRoot.AddComponent<CanvasScaler>();
+            browserRoot.AddComponent<GraphicRaycaster>();
+
+            var browserComponent = browserRoot.AddComponent<UI.FolderBrowserPanel>();
+            var browserRect = browserRoot.GetComponent<RectTransform>();
+            browserRect.sizeDelta = new Vector2(500, 700);
+            browserRect.localScale = Vector3.one * 0.001f;
+
+            // Position to the right of the user (opposite side from settings)
+            browserRoot.transform.position = new Vector3(1.0f, 1.2f, 1.5f);
+            browserRoot.transform.rotation = Quaternion.Euler(0, -20, 0);
+
+            // Create basic structure: path bar, navigation buttons, scroll content
+            var bg = CreateUIChild(browserRoot.transform, "Background");
+            var bgImg = bg.AddComponent<Image>();
+            bgImg.color = new Color(0.12f, 0.12f, 0.15f, 0.95f);
+            var bgRect = bg.GetComponent<RectTransform>();
+            bgRect.anchorMin = Vector2.zero;
+            bgRect.anchorMax = Vector2.one;
+            bgRect.offsetMin = Vector2.zero;
+            bgRect.offsetMax = Vector2.zero;
+
+            // Header with path and nav buttons
+            var header = CreateUIChild(bg.transform, "Header");
+            var headerImg = header.AddComponent<Image>();
+            headerImg.color = new Color(0.18f, 0.18f, 0.22f, 1f);
+            var headerRect = header.GetComponent<RectTransform>();
+            headerRect.anchorMin = new Vector2(0, 1);
+            headerRect.anchorMax = new Vector2(1, 1);
+            headerRect.pivot = new Vector2(0.5f, 1);
+            headerRect.sizeDelta = new Vector2(0, 80);
+            headerRect.offsetMin = new Vector2(0, -80);
+            headerRect.offsetMax = Vector2.zero;
+
+            // Path text
+            var pathGO = CreateUIChild(header.transform, "PathText");
+            var pathText = pathGO.AddComponent<TextMeshProUGUI>();
+            pathText.text = "/sdcard";
+            pathText.fontSize = 12;
+            pathText.color = Color.white;
+            pathText.alignment = TextAlignmentOptions.MidlineLeft;
+            pathText.enableWordWrapping = false;
+            pathText.overflowMode = TextOverflowModes.Ellipsis;
+            var pathRect = pathGO.GetComponent<RectTransform>();
+            pathRect.anchorMin = new Vector2(0, 0.5f);
+            pathRect.anchorMax = new Vector2(1, 1);
+            pathRect.offsetMin = new Vector2(10, 0);
+            pathRect.offsetMax = new Vector2(-10, -5);
+
+            // Scroll content area
+            var scrollArea = CreateUIChild(bg.transform, "ScrollArea");
+            var scrollRect = scrollArea.AddComponent<ScrollRect>();
+            var scrollAreaRect = scrollArea.GetComponent<RectTransform>();
+            scrollAreaRect.anchorMin = new Vector2(0, 0);
+            scrollAreaRect.anchorMax = new Vector2(1, 1);
+            scrollAreaRect.offsetMin = new Vector2(5, 30);
+            scrollAreaRect.offsetMax = new Vector2(-5, -85);
+
+            var content = CreateUIChild(scrollArea.transform, "Content");
+            var contentRect = content.GetComponent<RectTransform>();
+            contentRect.anchorMin = new Vector2(0, 1);
+            contentRect.anchorMax = new Vector2(1, 1);
+            contentRect.pivot = new Vector2(0.5f, 1);
+            contentRect.sizeDelta = new Vector2(0, 0);
+            scrollRect.content = contentRect;
+            scrollRect.vertical = true;
+            scrollRect.horizontal = false;
+
+            // Status bar at bottom
+            var statusGO = CreateUIChild(bg.transform, "StatusText");
+            var statusText = statusGO.AddComponent<TextMeshProUGUI>();
+            statusText.text = "Ready";
+            statusText.fontSize = 11;
+            statusText.color = new Color(0.6f, 0.6f, 0.6f);
+            statusText.alignment = TextAlignmentOptions.MidlineLeft;
+            var statusRect = statusGO.GetComponent<RectTransform>();
+            statusRect.anchorMin = new Vector2(0, 0);
+            statusRect.anchorMax = new Vector2(1, 0);
+            statusRect.pivot = new Vector2(0.5f, 0);
+            statusRect.sizeDelta = new Vector2(0, 25);
+            statusRect.offsetMin = new Vector2(10, 0);
+            statusRect.offsetMax = new Vector2(-10, 25);
+
+            Debug.Log("[SceneSetup] Folder browser panel placeholder created.");
         }
 
         private static void CreateResizeHandle(Transform parent, string name,

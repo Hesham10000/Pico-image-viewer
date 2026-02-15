@@ -9,10 +9,26 @@ namespace PicoImageViewer.UI
 {
     /// <summary>
     /// World-space settings panel. Provides controls for all app settings,
-    /// folder picking, and utility actions.
+    /// folder picking, mode switching, and utility actions.
     /// </summary>
     public class SettingsPanel : MonoBehaviour
     {
+        [Header("Mode")]
+        [SerializeField] private Button _normalModeButton;
+        [SerializeField] private Button _gridModeButton;
+        [SerializeField] private TextMeshProUGUI _currentModeLabel;
+        [SerializeField] private GameObject _gridSettingsGroup;    // shown only in Grid mode
+        [SerializeField] private GameObject _normalSettingsGroup;  // shown only in Normal mode
+
+        [Header("Normal Mode")]
+        [SerializeField] private Slider _normalSpacingSlider;
+        [SerializeField] private TextMeshProUGUI _normalSpacingLabel;
+        [SerializeField] private Slider _joystickDeadzoneSlider;
+        [SerializeField] private TextMeshProUGUI _joystickDeadzoneLabel;
+        [SerializeField] private Slider _joystickCooldownSlider;
+        [SerializeField] private TextMeshProUGUI _joystickCooldownLabel;
+        [SerializeField] private Button _closeAllNormalButton;
+
         [Header("Folder")]
         [SerializeField] private TMP_InputField _folderPathInput;
         [SerializeField] private Button _browseButton;
@@ -71,6 +87,17 @@ namespace PicoImageViewer.UI
 
         private void PopulateUI()
         {
+            // Mode
+            UpdateModeUI();
+
+            // Normal mode settings
+            SetupSlider(_normalSpacingSlider, _normalSpacingLabel, _settings.NormalModeSpacing,
+                0.1f, 3f, "Spacing: {0:F2}m");
+            SetupSlider(_joystickDeadzoneSlider, _joystickDeadzoneLabel, _settings.JoystickDeadzone,
+                0.1f, 0.9f, "Deadzone: {0:F2}");
+            SetupSlider(_joystickCooldownSlider, _joystickCooldownLabel, _settings.JoystickCooldown,
+                0.1f, 1.0f, "Cooldown: {0:F2}s");
+
             // Folder
             if (_folderPathInput != null)
                 _folderPathInput.text = _settings.LastRootFolder;
@@ -138,6 +165,26 @@ namespace PicoImageViewer.UI
 
         private void BindEvents()
         {
+            // Mode buttons
+            if (_normalModeButton != null)
+                _normalModeButton.onClick.AddListener(() => SwitchMode(ViewMode.Normal));
+            if (_gridModeButton != null)
+                _gridModeButton.onClick.AddListener(() => SwitchMode(ViewMode.Grid));
+
+            // Normal mode sliders
+            BindSlider(_normalSpacingSlider, _normalSpacingLabel, "Spacing: {0:F2}m",
+                v => _settings.NormalModeSpacing = v);
+            BindSlider(_joystickDeadzoneSlider, _joystickDeadzoneLabel, "Deadzone: {0:F2}",
+                v => _settings.JoystickDeadzone = v);
+            BindSlider(_joystickCooldownSlider, _joystickCooldownLabel, "Cooldown: {0:F2}s",
+                v => _settings.JoystickCooldown = v);
+
+            if (_closeAllNormalButton != null)
+                _closeAllNormalButton.onClick.AddListener(() => {
+                    NormalModeManager.Instance?.CloseAllWindows();
+                    UpdateStatus("Normal mode windows closed");
+                });
+
             // Folder
             if (_browseButton != null)
                 _browseButton.onClick.AddListener(OnBrowseFolder);
@@ -287,9 +334,49 @@ namespace PicoImageViewer.UI
                 _panelContent.SetActive(!_panelContent.activeSelf);
         }
 
+        private void SwitchMode(ViewMode mode)
+        {
+            _settings.Mode = mode;
+            ApplyAndSave();
+            WindowManager.Instance?.SetMode(mode);
+            UpdateModeUI();
+            UpdateStatus($"Switched to {mode} mode");
+        }
+
+        private void UpdateModeUI()
+        {
+            bool isGrid = _settings.Mode == ViewMode.Grid;
+
+            if (_currentModeLabel != null)
+                _currentModeLabel.text = isGrid ? "Mode: Grid" : "Mode: Normal";
+
+            // Show/hide mode-specific settings groups
+            if (_gridSettingsGroup != null)
+                _gridSettingsGroup.SetActive(isGrid);
+            if (_normalSettingsGroup != null)
+                _normalSettingsGroup.SetActive(!isGrid);
+
+            // Highlight active mode button
+            if (_normalModeButton != null)
+            {
+                var colors = _normalModeButton.colors;
+                colors.normalColor = isGrid ? new Color(0.3f, 0.3f, 0.35f) : new Color(0.2f, 0.5f, 0.8f);
+                _normalModeButton.colors = colors;
+            }
+            if (_gridModeButton != null)
+            {
+                var colors = _gridModeButton.colors;
+                colors.normalColor = isGrid ? new Color(0.2f, 0.5f, 0.8f) : new Color(0.3f, 0.3f, 0.35f);
+                _gridModeButton.colors = colors;
+            }
+        }
+
         private void OnDestroy()
         {
             // Cleanup listeners
+            if (_normalModeButton != null) _normalModeButton.onClick.RemoveAllListeners();
+            if (_gridModeButton != null) _gridModeButton.onClick.RemoveAllListeners();
+            if (_closeAllNormalButton != null) _closeAllNormalButton.onClick.RemoveAllListeners();
             if (_browseButton != null) _browseButton.onClick.RemoveAllListeners();
             if (_openFolderButton != null) _openFolderButton.onClick.RemoveAllListeners();
             if (_rescanButton != null) _rescanButton.onClick.RemoveAllListeners();

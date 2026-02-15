@@ -1,8 +1,8 @@
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using PicoImageViewer.Data;
 using PicoImageViewer.UI;
+using PicoImageViewer.Interaction;
 
 namespace PicoImageViewer.Core
 {
@@ -45,8 +45,8 @@ namespace PicoImageViewer.Core
 
         private void Start()
         {
-            // Auto-open last folder if set
-            if (!string.IsNullOrEmpty(_settings.LastRootFolder))
+            // Only auto-open in grid mode; normal mode uses the folder browser
+            if (_settings.Mode == ViewMode.Grid && !string.IsNullOrEmpty(_settings.LastRootFolder))
             {
                 OpenFolder(_settings.LastRootFolder);
             }
@@ -248,6 +248,35 @@ namespace PicoImageViewer.Core
         public List<FolderData> GetCurrentFolders() => _currentFolders;
         public List<ImageWindow> GetActiveWindows() => _activeWindows;
         public string GetCurrentRootFolder() => _currentRootFolder;
+        public ViewMode CurrentMode => _settings.Mode;
+
+        /// <summary>
+        /// Switch between Normal and Grid mode. Cleans up the current mode's
+        /// windows and activates the appropriate UI.
+        /// </summary>
+        public void SetMode(ViewMode mode)
+        {
+            if (_settings.Mode == mode) return;
+
+            // Clean up current mode
+            CloseAllWindows();
+            NormalModeManager.Instance?.CloseAllWindows();
+
+            _settings.Mode = mode;
+            _settings.Save();
+
+            // Activate mode-specific UI
+            OnModeChanged?.Invoke(mode);
+
+            if (mode == ViewMode.Grid && !string.IsNullOrEmpty(_settings.LastRootFolder))
+            {
+                OpenFolder(_settings.LastRootFolder);
+            }
+
+            Debug.Log($"[WindowManager] Switched to {mode} mode");
+        }
+
+        public System.Action<ViewMode> OnModeChanged;
 
         private void OnApplicationPause(bool paused)
         {
