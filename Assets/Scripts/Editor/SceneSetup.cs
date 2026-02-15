@@ -15,52 +15,93 @@ namespace PicoImageViewer.Editor
         [MenuItem("PicoImageViewer/Setup Scene")]
         public static void SetupMainScene()
         {
+            // Remove any existing default "Main Camera" that's not part of XR Rig
+            RemoveDefaultCamera();
+
             // Create XR Rig placeholder
-            var xrRig = CreateGameObject("XR Rig");
-            var cameraOffset = CreateChild(xrRig, "Camera Offset");
-            var mainCamera = CreateChild(cameraOffset, "Main Camera");
-            mainCamera.AddComponent<Camera>().tag = "MainCamera";
+            var xrRig = FindOrCreate("XR Rig");
+            var cameraOffset = FindOrCreateChild(xrRig, "Camera Offset");
+            var mainCamera = FindOrCreateChild(cameraOffset, "Main Camera");
+            if (mainCamera.GetComponent<Camera>() == null)
+            {
+                mainCamera.AddComponent<Camera>().tag = "MainCamera";
+                mainCamera.AddComponent<AudioListener>();
+            }
             mainCamera.tag = "MainCamera";
 
-            var leftController = CreateChild(cameraOffset, "Left Controller");
-            var rightController = CreateChild(cameraOffset, "Right Controller");
+            // Add EditorCameraController for desktop testing
+            if (mainCamera.GetComponent<Core.EditorCameraController>() == null)
+                mainCamera.AddComponent<Core.EditorCameraController>();
+
+            // Add XRSetup to XR Rig
+            if (xrRig.GetComponent<Core.XRSetup>() == null)
+                xrRig.AddComponent<Core.XRSetup>();
+
+            var leftController = FindOrCreateChild(cameraOffset, "Left Controller");
+            var rightController = FindOrCreateChild(cameraOffset, "Right Controller");
 
             // Create Managers
-            var managers = CreateGameObject("[Managers]");
+            var managers = FindOrCreate("[Managers]");
 
-            var windowMgrGO = CreateChild(managers, "WindowManager");
-            windowMgrGO.AddComponent<Core.WindowManager>();
+            var windowMgrGO = FindOrCreateChild(managers, "WindowManager");
+            if (windowMgrGO.GetComponent<Core.WindowManager>() == null)
+                windowMgrGO.AddComponent<Core.WindowManager>();
 
-            var normalMgrGO = CreateChild(managers, "NormalModeManager");
-            normalMgrGO.AddComponent<Core.NormalModeManager>();
+            var normalMgrGO = FindOrCreateChild(managers, "NormalModeManager");
+            if (normalMgrGO.GetComponent<Core.NormalModeManager>() == null)
+                normalMgrGO.AddComponent<Core.NormalModeManager>();
 
-            var texLoaderGO = CreateChild(managers, "TextureLoader");
-            texLoaderGO.AddComponent<Core.TextureLoader>();
+            var texLoaderGO = FindOrCreateChild(managers, "TextureLoader");
+            if (texLoaderGO.GetComponent<Core.TextureLoader>() == null)
+                texLoaderGO.AddComponent<Core.TextureLoader>();
 
-            var permissionsGO = CreateChild(managers, "AndroidPermissions");
-            permissionsGO.AddComponent<Android.AndroidPermissions>();
+            var permissionsGO = FindOrCreateChild(managers, "AndroidPermissions");
+            if (permissionsGO.GetComponent<Android.AndroidPermissions>() == null)
+                permissionsGO.AddComponent<Android.AndroidPermissions>();
 
             // Window Container (shared by both modes)
-            CreateChild(managers, "WindowContainer");
+            FindOrCreateChild(managers, "WindowContainer");
 
             // Joystick Image Navigator (for normal mode image cycling)
-            var joystickNavGO = CreateChild(managers, "JoystickImageNavigator");
-            joystickNavGO.AddComponent<Interaction.JoystickImageNavigator>();
+            var joystickNavGO = FindOrCreateChild(managers, "JoystickImageNavigator");
+            if (joystickNavGO.GetComponent<Interaction.JoystickImageNavigator>() == null)
+                joystickNavGO.AddComponent<Interaction.JoystickImageNavigator>();
 
             // Create App Bootstrap
-            var bootstrapGO = CreateGameObject("[AppBootstrap]");
-            bootstrapGO.AddComponent<Core.AppBootstrap>();
+            var bootstrapGO = FindOrCreate("[AppBootstrap]");
+            if (bootstrapGO.GetComponent<Core.AppBootstrap>() == null)
+                bootstrapGO.AddComponent<Core.AppBootstrap>();
 
             // Settings Panel (world-space canvas)
-            CreateSettingsPanelPlaceholder();
+            if (GameObject.Find("SettingsPanel") == null)
+                CreateSettingsPanelPlaceholder();
 
             // Folder Browser Panel (world-space, for Normal mode)
-            CreateFolderBrowserPlaceholder();
+            if (GameObject.Find("FolderBrowserPanel") == null)
+                CreateFolderBrowserPlaceholder();
 
-            // Create ImageWindow prefab placeholder
+            // Create ImageWindow prefab
             CreateImageWindowPrefab();
 
-            Debug.Log("[SceneSetup] Scene hierarchy created. Configure references in Inspector.");
+            Debug.Log("[SceneSetup] Scene hierarchy created. All references auto-discover at runtime!");
+        }
+
+        /// <summary>
+        /// Remove the default standalone Main Camera that Unity creates with new scenes.
+        /// The XR Rig has its own camera.
+        /// </summary>
+        private static void RemoveDefaultCamera()
+        {
+            // Find all root GameObjects named "Main Camera" that are NOT inside an XR Rig
+            var cameras = Object.FindObjectsByType<Camera>(FindObjectsSortMode.None);
+            foreach (var cam in cameras)
+            {
+                if (cam.gameObject.name == "Main Camera" && cam.transform.parent == null)
+                {
+                    Debug.Log("[SceneSetup] Removing default standalone Main Camera");
+                    Object.DestroyImmediate(cam.gameObject);
+                }
+            }
         }
 
         [MenuItem("PicoImageViewer/Create ImageWindow Prefab")]
@@ -215,12 +256,18 @@ namespace PicoImageViewer.Editor
                 Interaction.WindowResizeHandle.HandlePosition.TopLeft,
                 new Vector2(0, 1), new Vector2(0, 1));
 
-            // Save as prefab
+            // Save as prefab in both locations
             string prefabPath = "Assets/Prefabs/ImageWindow.prefab";
             EnsureDirectory("Assets/Prefabs");
             PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+
+            // Also save to Resources so it can be loaded at runtime
+            string resourcesPath = "Assets/Resources/ImageWindow.prefab";
+            EnsureDirectory("Assets/Resources");
+            PrefabUtility.SaveAsPrefabAsset(root, resourcesPath);
+
             Object.DestroyImmediate(root);
-            Debug.Log($"[SceneSetup] ImageWindow prefab saved to {prefabPath}");
+            Debug.Log($"[SceneSetup] ImageWindow prefab saved to {prefabPath} and {resourcesPath}");
         }
 
         private static void CreateSettingsPanelPlaceholder()
@@ -416,16 +463,26 @@ namespace PicoImageViewer.Editor
             return go;
         }
 
-        private static GameObject CreateGameObject(string name)
+        private static GameObject FindOrCreate(string name)
         {
+            var existing = GameObject.Find(name);
+            if (existing != null) return existing;
             return new GameObject(name);
         }
 
-        private static GameObject CreateChild(GameObject parent, string name)
+        private static GameObject FindOrCreateChild(GameObject parent, string name)
         {
+            var t = parent.transform.Find(name);
+            if (t != null) return t.gameObject;
+
             var go = new GameObject(name);
             go.transform.SetParent(parent.transform, false);
             return go;
+        }
+
+        private static GameObject CreateGameObject(string name)
+        {
+            return new GameObject(name);
         }
 
         private static GameObject CreateUIChild(Transform parent, string name)

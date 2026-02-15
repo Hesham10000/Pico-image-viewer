@@ -45,11 +45,50 @@ namespace PicoImageViewer.Core
 
         private void Start()
         {
+            // Auto-discover references if not assigned
+            AutoDiscoverReferences();
+
             // Only auto-open in grid mode; normal mode uses the folder browser
             if (_settings.Mode == ViewMode.Grid && !string.IsNullOrEmpty(_settings.LastRootFolder))
             {
                 OpenFolder(_settings.LastRootFolder);
             }
+        }
+
+        private void AutoDiscoverReferences()
+        {
+            if (_imageWindowPrefab == null)
+            {
+                _imageWindowPrefab = Resources.Load<GameObject>("ImageWindow");
+                if (_imageWindowPrefab == null)
+                {
+                    // Try loading from Prefabs folder via path
+                    var prefabs = Resources.FindObjectsOfTypeAll<UI.ImageWindow>();
+                    foreach (var p in prefabs)
+                    {
+                        if (p.gameObject.scene.name == null) // it's a prefab asset
+                        {
+                            _imageWindowPrefab = p.gameObject;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (_windowContainer == null)
+            {
+                var go = GameObject.Find("WindowContainer");
+                if (go != null) _windowContainer = go.transform;
+                else
+                {
+                    // Create one under [Managers]
+                    var container = new GameObject("WindowContainer");
+                    container.transform.SetParent(transform.parent, false);
+                    _windowContainer = container.transform;
+                }
+            }
+
+            Debug.Log($"[WindowManager] Auto-discovered: Prefab={_imageWindowPrefab != null}, Container={_windowContainer != null}");
         }
 
         /// <summary>

@@ -8,7 +8,7 @@ namespace PicoImageViewer.Core
     /// <summary>
     /// Application entry point. Initializes subsystems, requests permissions,
     /// sets up XR references, and manages mode-dependent UI visibility.
-    /// Attach to a root GameObject in the scene.
+    /// Auto-discovers references at runtime if not assigned in Inspector.
     /// </summary>
     public class AppBootstrap : MonoBehaviour
     {
@@ -36,12 +36,8 @@ namespace PicoImageViewer.Core
 
         private void Start()
         {
-            // Find XR camera if not assigned
-            if (_headCamera == null)
-            {
-                Camera mainCam = Camera.main;
-                if (mainCam != null) _headCamera = mainCam.transform;
-            }
+            // Auto-discover references if not assigned in Inspector
+            AutoDiscoverReferences();
 
             // Wire up head transform to managers
             if (_headCamera != null)
@@ -65,6 +61,60 @@ namespace PicoImageViewer.Core
 
             // Request permissions then proceed
             RequestPermissionsAndInit();
+        }
+
+        /// <summary>
+        /// Finds all references by searching the scene hierarchy.
+        /// This eliminates the need to manually wire up Inspector references.
+        /// </summary>
+        private void AutoDiscoverReferences()
+        {
+            // Find XR Rig
+            if (_xrRig == null)
+            {
+                var rigGO = GameObject.Find("XR Rig");
+                if (rigGO != null) _xrRig = rigGO.transform;
+            }
+
+            // Find head camera
+            if (_headCamera == null)
+            {
+                Camera mainCam = Camera.main;
+                if (mainCam != null) _headCamera = mainCam.transform;
+            }
+
+            // Find controllers
+            if (_leftController == null)
+            {
+                var go = GameObject.Find("Left Controller");
+                if (go != null) _leftController = go.transform;
+            }
+            if (_rightController == null)
+            {
+                var go = GameObject.Find("Right Controller");
+                if (go != null) _rightController = go.transform;
+            }
+
+            // Find managers
+            if (_windowManager == null)
+                _windowManager = FindAnyObjectByType<WindowManager>();
+            if (_normalModeManager == null)
+                _normalModeManager = FindAnyObjectByType<NormalModeManager>();
+            if (_textureLoader == null)
+                _textureLoader = FindAnyObjectByType<TextureLoader>();
+            if (_androidPermissions == null)
+                _androidPermissions = FindAnyObjectByType<AndroidPermissions>();
+
+            // Find UI panels
+            if (_settingsPanel == null)
+                _settingsPanel = FindAnyObjectByType<SettingsPanel>();
+            if (_folderBrowserPanel == null)
+                _folderBrowserPanel = FindAnyObjectByType<FolderBrowserPanel>();
+
+            Debug.Log($"[AppBootstrap] Auto-discovered references: " +
+                      $"Camera={_headCamera != null}, WindowMgr={_windowManager != null}, " +
+                      $"NormalMgr={_normalModeManager != null}, TextureLoader={_textureLoader != null}, " +
+                      $"Settings={_settingsPanel != null}, FolderBrowser={_folderBrowserPanel != null}");
         }
 
         private void RequestPermissionsAndInit()

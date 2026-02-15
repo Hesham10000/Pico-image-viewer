@@ -27,6 +27,18 @@ namespace PicoImageViewer.Core
 
         private void Start()
         {
+            // Auto-discover controller transforms if not assigned
+            if (_leftControllerTransform == null)
+            {
+                var go = GameObject.Find("Left Controller");
+                if (go != null) _leftControllerTransform = go.transform;
+            }
+            if (_rightControllerTransform == null)
+            {
+                var go = GameObject.Find("Right Controller");
+                if (go != null) _rightControllerTransform = go.transform;
+            }
+
             SetupController(_leftControllerTransform, "LeftRayInteractor");
             SetupController(_rightControllerTransform, "RightRayInteractor");
 

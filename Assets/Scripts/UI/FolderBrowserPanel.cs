@@ -13,7 +13,7 @@ namespace PicoImageViewer.UI
     /// <summary>
     /// World-space folder browser for Normal mode. Shows a navigable directory tree
     /// with image thumbnails. Clicking an image opens it in a new floating window.
-    /// Similar in concept to a desktop file manager (like qimgv's folder navigation).
+    /// Auto-discovers child UI elements by name if not assigned in Inspector.
     /// </summary>
     public class FolderBrowserPanel : MonoBehaviour
     {
@@ -58,6 +58,9 @@ namespace PicoImageViewer.UI
 
         private void Start()
         {
+            // Auto-discover UI elements by searching child hierarchy
+            AutoDiscoverUI();
+
             if (_upButton != null)
                 _upButton.onClick.AddListener(NavigateUp);
             if (_backButton != null)
@@ -71,10 +74,155 @@ namespace PicoImageViewer.UI
                 ? settings.LastBrowsedFolder
                 : settings.LastRootFolder;
 
+#if UNITY_EDITOR
+            // In editor, use a desktop-friendly default if the Android path doesn't exist
+            if (!Directory.Exists(startPath))
+            {
+                // Try common desktop paths
+                string desktopPictures = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+                string desktopDocuments = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                string userHome = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+                if (!string.IsNullOrEmpty(desktopPictures) && Directory.Exists(desktopPictures))
+                    startPath = desktopPictures;
+                else if (!string.IsNullOrEmpty(desktopDocuments) && Directory.Exists(desktopDocuments))
+                    startPath = desktopDocuments;
+                else if (!string.IsNullOrEmpty(userHome) && Directory.Exists(userHome))
+                    startPath = userHome;
+                else
+                    startPath = Application.dataPath; // fallback to project Assets folder
+
+                Debug.Log($"[FolderBrowser] Editor mode: using desktop path {startPath}");
+            }
+#endif
+
             if (Directory.Exists(startPath))
                 NavigateTo(startPath);
             else
-                NavigateTo("/sdcard");
+                NavigateTo(GetDefaultStartPath());
+        }
+
+        private string GetDefaultStartPath()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            return "/sdcard";
+#else
+            string pictures = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+            if (!string.IsNullOrEmpty(pictures) && Directory.Exists(pictures))
+                return pictures;
+            return Application.dataPath;
+#endif
+        }
+
+        /// <summary>
+        /// Auto-discover UI child elements by name from the hierarchy.
+        /// </summary>
+        private void AutoDiscoverUI()
+        {
+            if (_currentPathText == null)
+            {
+                var go = FindChildRecursive(transform, "PathText");
+                if (go != null) _currentPathText = go.GetComponent<TextMeshProUGUI>();
+            }
+
+            if (_statusText == null)
+            {
+                var go = FindChildRecursive(transform, "StatusText");
+                if (go != null) _statusText = go.GetComponent<TextMeshProUGUI>();
+            }
+
+            if (_scrollRect == null)
+            {
+                var go = FindChildRecursive(transform, "ScrollArea");
+                if (go != null) _scrollRect = go.GetComponent<ScrollRect>();
+            }
+
+            if (_contentContainer == null)
+            {
+                var go = FindChildRecursive(transform, "Content");
+                if (go != null) _contentContainer = go.GetComponent<RectTransform>();
+            }
+
+            // Auto-create nav buttons if they don't exist in hierarchy
+            EnsureNavigationButtons();
+
+            Debug.Log($"[FolderBrowser] Auto-discovered: Path={_currentPathText != null}, " +
+                      $"Status={_statusText != null}, Scroll={_scrollRect != null}, " +
+                      $"Content={_contentContainer != null}");
+        }
+
+        private void EnsureNavigationButtons()
+        {
+            // Find or create navigation buttons in the Header area
+            var header = FindChildRecursive(transform, "Header");
+            if (header == null) return;
+
+            if (_upButton == null)
+            {
+                var go = FindChildRecursive(header, "UpButton");
+                if (go != null) _upButton = go.GetComponent<Button>();
+                else _upButton = CreateNavButton(header, "UpButton", "Up", 0);
+            }
+
+            if (_backButton == null)
+            {
+                var go = FindChildRecursive(header, "BackButton");
+                if (go != null) _backButton = go.GetComponent<Button>();
+                else _backButton = CreateNavButton(header, "BackButton", "Back", 1);
+            }
+
+            if (_homeButton == null)
+            {
+                var go = FindChildRecursive(header, "HomeButton");
+                if (go != null) _homeButton = go.GetComponent<Button>();
+                else _homeButton = CreateNavButton(header, "HomeButton", "Home", 2);
+            }
+        }
+
+        private Button CreateNavButton(Transform parent, string name, string label, int index)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0, 0);
+            rect.anchorMax = new Vector2(0, 0.5f);
+            rect.pivot = new Vector2(0, 0.5f);
+            float btnWidth = 80f;
+            float spacing = 5f;
+            rect.anchoredPosition = new Vector2(10 + index * (btnWidth + spacing), 0);
+            rect.sizeDelta = new Vector2(btnWidth, 30);
+
+            var img = go.AddComponent<Image>();
+            img.color = new Color(0.25f, 0.3f, 0.4f, 1f);
+            var btn = go.AddComponent<Button>();
+
+            var textGO = new GameObject("Text", typeof(RectTransform));
+            textGO.transform.SetParent(go.transform, false);
+            var tmp = textGO.AddComponent<TextMeshProUGUI>();
+            tmp.text = label;
+            tmp.fontSize = 13;
+            tmp.color = Color.white;
+            tmp.alignment = TextAlignmentOptions.Center;
+            var textRect = textGO.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+
+            return btn;
+        }
+
+        private static Transform FindChildRecursive(Transform parent, string name)
+        {
+            for (int i = 0; i < parent.childCount; i++)
+            {
+                var child = parent.GetChild(i);
+                if (child.name == name) return child;
+                var found = FindChildRecursive(child, name);
+                if (found != null) return found;
+            }
+            return null;
         }
 
         /// <summary>
@@ -371,7 +519,7 @@ namespace PicoImageViewer.UI
             var settings = AppSettings.Load();
             string home = !string.IsNullOrEmpty(settings.LastRootFolder)
                 ? settings.LastRootFolder
-                : "/sdcard";
+                : GetDefaultStartPath();
             NavigateTo(home);
         }
 

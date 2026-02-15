@@ -48,6 +48,41 @@ namespace PicoImageViewer.Core
         private void Start()
         {
             _settings = AppSettings.Load();
+            AutoDiscoverReferences();
+        }
+
+        private void AutoDiscoverReferences()
+        {
+            if (_imageWindowPrefab == null)
+            {
+                _imageWindowPrefab = Resources.Load<GameObject>("ImageWindow");
+                if (_imageWindowPrefab == null)
+                {
+                    var prefabs = Resources.FindObjectsOfTypeAll<UI.ImageWindow>();
+                    foreach (var p in prefabs)
+                    {
+                        if (p.gameObject.scene.name == null)
+                        {
+                            _imageWindowPrefab = p.gameObject;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (_windowContainer == null)
+            {
+                var go = GameObject.Find("WindowContainer");
+                if (go != null) _windowContainer = go.transform;
+                else
+                {
+                    var container = new GameObject("WindowContainer");
+                    container.transform.SetParent(transform.parent, false);
+                    _windowContainer = container.transform;
+                }
+            }
+
+            Debug.Log($"[NormalModeManager] Auto-discovered: Prefab={_imageWindowPrefab != null}, Container={_windowContainer != null}");
         }
 
         public void SetHeadTransform(Transform head)
