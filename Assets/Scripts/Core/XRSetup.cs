@@ -1,10 +1,11 @@
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Interactors;
 
 namespace PicoImageViewer.Core
 {
     /// <summary>
-    /// Configures XR Interaction Toolkit components for Pico 4 Ultra.
+    /// Configures XR Interaction Toolkit 3.x components for Pico 4 Ultra.
     /// Sets up ray interactors on controllers for interacting with world-space UI.
     /// Attach to the XR Rig root.
     /// </summary>
@@ -30,7 +31,7 @@ namespace PicoImageViewer.Core
             SetupController(_rightControllerTransform, "RightRayInteractor");
 
             // Ensure XRInteractionManager exists
-            if (FindObjectOfType<XRInteractionManager>() == null)
+            if (FindAnyObjectByType<XRInteractionManager>() == null)
             {
                 var managerGO = new GameObject("XRInteractionManager");
                 managerGO.transform.SetParent(transform);
@@ -48,7 +49,7 @@ namespace PicoImageViewer.Core
             rayGO.transform.localPosition = Vector3.zero;
             rayGO.transform.localRotation = Quaternion.identity;
 
-            // Add XR Ray Interactor
+            // Add XR Ray Interactor (XRI 3.x)
             var rayInteractor = rayGO.AddComponent<XRRayInteractor>();
             rayInteractor.maxRaycastDistance = _rayMaxDistance;
 

@@ -1,10 +1,11 @@
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 namespace PicoImageViewer.Interaction
 {
     /// <summary>
-    /// Enables dragging of an ImageWindow in 3D space via XR Interaction Toolkit.
+    /// Enables dragging of an ImageWindow in 3D space via XR Interaction Toolkit 3.x.
     /// Attach to the title bar collider or the window body collider.
     /// Uses XRGrabInteractable for controller/hand-based grabbing.
     /// </summary>
@@ -27,15 +28,12 @@ namespace PicoImageViewer.Interaction
             // Find the window root (parent with ImageWindow component)
             _windowRoot = _useParentTransform ? FindWindowRoot() : transform;
 
-            // Configure grab behavior
+            // Configure grab behavior for XRI 3.x
             movementType = MovementType.Instantaneous;
             throwOnDetach = false;
             trackPosition = true;
             trackRotation = true;
-            smoothPosition = true;
-            smoothPositionAmount = 12f;
-            smoothRotation = true;
-            smoothRotationAmount = 8f;
+            useDynamicAttach = true;
 
             // Ensure rigidbody is kinematic (no physics)
             var rb = GetComponent<Rigidbody>();

@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
+using UnityEngine.XR.Interaction.Toolkit.Interactors;
 using PicoImageViewer.UI;
 
 namespace PicoImageViewer.Interaction
@@ -7,6 +9,7 @@ namespace PicoImageViewer.Interaction
     /// <summary>
     /// Resize handle for image windows. Attach to corner/edge colliders.
     /// Dragging this handle resizes the parent ImageWindow.
+    /// Compatible with XR Interaction Toolkit 3.x.
     /// </summary>
     public class WindowResizeHandle : XRBaseInteractable
     {
