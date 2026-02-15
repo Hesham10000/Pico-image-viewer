@@ -24,6 +24,22 @@ C:\sparrow_rls_oversea_K_pico_emulator_win64_20250924\sparrow_rls_oversea_K_pico
 ````shell
 C:\platform-tools-latest-windows\platform-tools\adb.exe devices
 C:\platform-tools-latest-windows\platform-tools\adb.exe install -r "C:\Users\hesha\projects\Pico-Starter\pico-starter.apk"
+C:\platform-tools-latest-windows\platform-tools\adb.exe install -r "C:\Users\hesha\projects\Pico-image-viewer\img-viewer.apk"
 
 
 ````
+
+## Debug
+
+````shell
+C:\platform-tools-latest-windows\platform-tools\adb.exe shell pm list packages | findstr -i viewer
+C:\platform-tools-latest-windows\platform-tools\adb.exe shell pm list packages | findstr /i xleven
+C:\platform-tools-latest-windows\platform-tools\adb.exe shell cmd package resolve-activity --brief Xleven.PicoImageViewer
+C:\platform-tools-latest-windows\platform-tools\adb.exe logcat -c
+C:\platform-tools-latest-windows\platform-tools\adb.exe shell am start -n Xleven.PicoImageViewer/.MainActivity
+C:\platform-tools-latest-windows\platform-tools\adb.exe logcat -d | findstr /i "FATAL EXCEPTION AndroidRuntime ActivityManager Unity libc Xleven PicoImageViewer"
+
+
+
+````
+
