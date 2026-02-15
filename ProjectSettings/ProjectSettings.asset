@@ -6,7 +6,7 @@ PlayerSettings:
   companyName: PicoImageViewer
   defaultInterfaceOrientation: 4
   AndroidMinSdkVersion: 29
-  AndroidTargetSdkVersion: 32
+  AndroidTargetSdkVersion: 34
   androidTargetDevices: 0
   graphicsJobs: 1
   colorSpace: 1

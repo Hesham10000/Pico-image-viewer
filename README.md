@@ -54,11 +54,11 @@ Grid mode spawns **5 draggable, resizable windows**:
 
 ## Requirements
 
-- **Unity**: 6.3 LTS or newer
-- **Pico XR SDK**: PICO Unity Integration SDK (install via Pico developer portal)
-- **XR Interaction Toolkit**: 2.5.x (included in package manifest)
-- **TextMeshPro**: 3.0.x (included in package manifest)
-- **Input System**: 1.7.x (included in package manifest)
+- **Unity**: 6.3 LTS (6000.0.x) or newer
+- **Pico XR SDK**: PICO Unity Integration SDK (Unity 6-compatible version from Pico developer portal)
+- **XR Interaction Toolkit**: 3.0.x (included in package manifest)
+- **TextMeshPro**: 4.0.x (included in package manifest)
+- **Input System**: 1.11.x (included in package manifest)
 - **Target device**: Pico 4 Ultra (Android API 29+)
 - **Build target**: Android (ARM64)
 
