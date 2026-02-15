@@ -14,6 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: PICO.Platform::Unity.XR.PXR.PXR_PlatformSetting
   entitlementCheckSimulation: 0
   startTimeEntitlementCheck: 0
-  appID: 
+  appID: f61c0b93d91a271495e1bb0e1b0b8d52
   useHighlight: 1
   deviceSN: []
