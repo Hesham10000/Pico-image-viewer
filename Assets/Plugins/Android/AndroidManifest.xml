@@ -10,5 +10,16 @@
     <application
         android:requestLegacyExternalStorage="true"
         tools:replace="android:requestLegacyExternalStorage">
+
+        <activity
+            android:name="com.unity3d.player.UnityPlayerActivity"
+            android:exported="true"
+            tools:node="merge">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
     </application>
 </manifest>
