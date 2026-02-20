@@ -185,7 +185,8 @@ namespace PicoImageViewer.UI
             go.transform.SetParent(parent, false);
 
             var rect = go.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0, 0);
+            // Anchor to center-left of Header so buttons stay inside the panel
+            rect.anchorMin = new Vector2(0, 0.5f);
             rect.anchorMax = new Vector2(0, 0.5f);
             rect.pivot = new Vector2(0, 0.5f);
             float btnWidth = 80f;
@@ -517,10 +518,24 @@ namespace PicoImageViewer.UI
         private void NavigateHome()
         {
             var settings = AppSettings.Load();
-            string home = !string.IsNullOrEmpty(settings.LastRootFolder)
-                ? settings.LastRootFolder
-                : GetDefaultStartPath();
-            NavigateTo(home);
+            string home = settings.LastRootFolder;
+
+            // If stored home path doesn't exist, try common fallbacks
+            if (string.IsNullOrEmpty(home) || !Directory.Exists(home))
+            {
+                // Try common Pico paths
+                string[] fallbacks = { "/sdcard/Paradox", "/sdcard/Download", "/sdcard/Downloads", "/sdcard" };
+                home = null;
+                foreach (var path in fallbacks)
+                {
+                    if (Directory.Exists(path)) { home = path; break; }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(home))
+                NavigateTo(home);
+            else
+                NavigateTo(GetDefaultStartPath());
         }
 
         private void ClearItems()

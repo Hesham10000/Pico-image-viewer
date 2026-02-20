@@ -48,9 +48,10 @@ namespace PicoImageViewer.UI
         private List<ImageData> _siblingImages;
         private int _currentSiblingIndex = -1;
 
-        // Window sizing (in world-space meters, mapped to localScale)
+        // Window sizing (in world-space meters, mapped to Canvas sizeDelta)
         private float _currentWidth;
         private float _currentHeight;
+        private float _canvasScale = 0.001f; // prefab's original localScale (preserved)
         private const float MinWindowSize = 0.1f;
         private const float MaxWindowSize = 5.0f;
         private const float ZoomStep = 0.1f;
@@ -65,6 +66,10 @@ namespace PicoImageViewer.UI
         public void Initialize(ImageData imageData, float width, float height,
             Vector3 gridPos, Quaternion gridRot)
         {
+            // Preserve the prefab's canvas scale (typically 0.001 for world-space UI)
+            _canvasScale = transform.localScale.x;
+            if (_canvasScale <= 0f) _canvasScale = 0.001f;
+
             _imageData = imageData;
             _defaultWidth = width;
             _defaultHeight = height;
@@ -109,6 +114,10 @@ namespace PicoImageViewer.UI
             transform.rotation = entry.Rotation;
             _currentWidth = entry.Width;
             _currentHeight = entry.Height;
+
+            // Restore canvas scale if the saved entry had the old localScale behaviour
+            if (entry.Scale.x > 0.01f)
+                _canvasScale = 0.001f; // reset to standard VR canvas scale
             ApplySize();
 
             if (entry.IsHidden)
@@ -201,13 +210,20 @@ namespace PicoImageViewer.UI
 
         private void ApplySize()
         {
-            // Size the window via RectTransform sizeDelta (in canvas units).
-            // With localScale 0.001, sizeDelta 500 = 0.5m in world space.
-            // So we multiply meters by 1000 to get canvas units.
-            if (_windowRect != null)
+            // Convert meters to canvas units (e.g. 0.5m / 0.001 = 500 units).
+            // This preserves the prefab's original localScale (0.001) so child UI
+            // elements remain correctly sized.
+            var canvasRect = GetComponent<RectTransform>();
+            if (canvasRect != null)
             {
-                _windowRect.sizeDelta = new Vector2(_currentWidth * 1000f, _currentHeight * 1000f);
+                canvasRect.sizeDelta = new Vector2(
+                    _currentWidth / _canvasScale,
+                    _currentHeight / _canvasScale
+                );
             }
+
+            // Ensure localScale stays at the original prefab scale
+            transform.localScale = new Vector3(_canvasScale, _canvasScale, _canvasScale);
         }
 
 

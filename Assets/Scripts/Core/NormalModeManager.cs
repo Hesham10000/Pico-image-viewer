@@ -82,7 +82,14 @@ namespace PicoImageViewer.Core
                 }
             }
 
-            Debug.Log($"[NormalModeManager] Auto-discovered: Prefab={_imageWindowPrefab != null}, Container={_windowContainer != null}");
+            // Auto-discover head transform from main camera
+            if (_headTransform == null && Camera.main != null)
+            {
+                _headTransform = Camera.main.transform;
+            }
+
+            Debug.Log($"[NormalModeManager] Auto-discovered: Prefab={_imageWindowPrefab != null}, " +
+                      $"Container={_windowContainer != null}, Head={_headTransform != null}");
         }
 
         public void SetHeadTransform(Transform head)
@@ -157,29 +164,34 @@ namespace PicoImageViewer.Core
 
             if (_lastOpenedWindow == null || _openWindows.Count == 0)
             {
-                // First window: place in front of user
+                // First window: place in front of user at eye level
                 Vector3 forward = _headTransform != null ? _headTransform.forward : Vector3.forward;
                 forward.y = 0;
                 if (forward.sqrMagnitude < 0.01f) forward = Vector3.forward;
                 forward.Normalize();
 
                 float dist = _settings != null ? _settings.GridForwardOffset : _initialForwardDistance;
-                Vector3 origin = _headTransform != null ? _headTransform.position : Vector3.zero;
+                Vector3 origin = _headTransform != null ? _headTransform.position : new Vector3(0, 1.5f, 0);
+
+                // Place at eye level (use head Y position, not floor)
                 position = origin + forward * dist;
                 rotation = Quaternion.LookRotation(-forward, Vector3.up);
                 return;
             }
 
             // Determine placement direction based on count
-            // Pattern: every 3rd window goes below-left (new row), others go right
+            // Pattern: every 3rd window goes below (new row), others go right
             PlacementDirection dir = GetNextPlacementDirection();
 
             Vector3 lastPos = _lastOpenedWindow.transform.position;
             Quaternion lastRot = _lastOpenedWindow.transform.rotation;
             rotation = lastRot;
 
-            Vector3 rightDir = lastRot * Vector3.left;   // window's local right
-            Vector3 downDir = lastRot * Vector3.down;     // window's local down
+            // For a canvas facing the user (LookRotation(-forward)):
+            //   rotation * Vector3.left  = user's right direction
+            //   rotation * Vector3.down  = world down
+            Vector3 rightDir = lastRot * Vector3.left;
+            Vector3 downDir = Vector3.down; // use world down for consistent vertical tiling
 
             float stepRight = width + spacing;
             float stepDown = height + spacing;
@@ -193,6 +205,7 @@ namespace PicoImageViewer.Core
                     position = lastPos - rightDir * stepRight;
                     break;
                 case PlacementDirection.Below:
+                    // New row: move down and reset to the first window's X position
                     position = lastPos + downDir * stepDown;
                     break;
                 case PlacementDirection.Above:
