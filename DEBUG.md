@@ -43,3 +43,11 @@ C:\platform-tools-latest-windows\platform-tools\adb.exe logcat -d | findstr /i "
 
 ````
 
+
+## Obtain headset log
+https://developer.picoxr.com/zh/document/unreal/pdc-faq/
+````shell
+adb pull data/logs 
+````
+
+

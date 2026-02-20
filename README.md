@@ -15,7 +15,7 @@ A standalone XR application for **Pico 4 Ultra** (Pico OS) that lets you browse 
 - Every window is draggable, resizable, and has the same controls as Grid mode
 
 **Grid Mode** — Batch comparison:
-- Select a root folder (e.g., `paradox/`)
+- Select a root folder (e.g., `Paradox/`)
 - App scans all subfolders and spawns one window per image
 - Windows are arranged in a grid: subfolders = rows, images = columns
 - Example: `Folder1/` (2 images) + `Folder2/` (3 images) = 5 windows in 2 rows
@@ -249,13 +249,13 @@ The in-app settings panel provides:
 | Joystick cooldown | 0.3s | Minimum interval between image changes |
 
 ### Grid Mode Settings
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Root folder | `/sdcard/Download/paradox` | Path to scan |
-| Forward offset | 2.0m | Grid distance from user |
-| Up offset | 0.0m | Grid vertical offset |
-| Row spacing | 0.8m | Gap between rows |
-| Column spacing | 0.6m | Gap between columns |
+| Setting | Default           | Description |
+|---------|-------------------|-------------|
+| Root folder | `/sdcard/Paradox` | Path to scan |
+| Forward offset | 2.0m              | Grid distance from user |
+| Up offset | 0.0m              | Grid vertical offset |
+| Row spacing | 0.8m              | Gap between rows |
+| Column spacing | 0.6m              | Gap between columns |
 
 ### Shared Settings
 | Setting | Default | Description |

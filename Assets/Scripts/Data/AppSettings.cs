@@ -21,7 +21,7 @@ namespace PicoImageViewer.Data
         public ViewMode Mode = ViewMode.Normal; // default is Normal
 
         // Folder
-        public string LastRootFolder = "/sdcard/Download/paradox";
+        public string LastRootFolder = "/sdcard/Paradox";
         public string LastBrowsedFolder = "";     // normal mode: last navigated folder
         public string LastOpenedImage = "";        // normal mode: last opened image path
 

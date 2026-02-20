@@ -201,10 +201,15 @@ namespace PicoImageViewer.UI
 
         private void ApplySize()
         {
-            // The window's world size is controlled via localScale on the root Canvas.
-            // _currentWidth and _currentHeight define the logical size in meters.
-            transform.localScale = new Vector3(_currentWidth, _currentHeight, 1f);
+            // Size the window via RectTransform sizeDelta (in canvas units).
+            // With localScale 0.001, sizeDelta 500 = 0.5m in world space.
+            // So we multiply meters by 1000 to get canvas units.
+            if (_windowRect != null)
+            {
+                _windowRect.sizeDelta = new Vector2(_currentWidth * 1000f, _currentHeight * 1000f);
+            }
         }
+
 
         public void SetSize(float width, float height)
         {

@@ -4,7 +4,13 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
+  m_Scenes:
+  - enabled: 0
+    path: Assets/Second.unity
+    guid: d48bb62ee80f47647bb63b473d72c10e
+  - enabled: 1
+    path: Assets/Third.unity
+    guid: 34e4818541ec77c49ac3c5b96427bf87
   m_configObjects:
     Unity.XR.PICO.LivePreview.Settings: {fileID: 11400000, guid: e24a98a5002904b4fa103b52a973220e, type: 2}
     Unity.XR.PXR.Settings: {fileID: 11400000, guid: efc5c0dfb5a550c4ba2f8da623489687, type: 2}

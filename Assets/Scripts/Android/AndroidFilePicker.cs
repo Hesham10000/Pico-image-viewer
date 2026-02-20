@@ -107,7 +107,7 @@ namespace PicoImageViewer.Android
                     string treePart = encoded.Substring(treeIdx + 6);
                     treePart = Uri.UnescapeDataString(treePart);
 
-                    // "primary:Download/paradox" → "/sdcard/Download/paradox"
+                    // "primary:Download/paradox" → "/sdcard/Paradox"
                     if (treePart.StartsWith("primary:"))
                     {
                         string relativePath = treePart.Substring(8);

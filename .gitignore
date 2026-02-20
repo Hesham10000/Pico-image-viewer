@@ -64,6 +64,21 @@ Thumbs.db
 local.properties
 /Packages/PICO Unity Integration SDK-3.3.3-20251202/
 /Packages/Unity Live Preview Plugin-1.0.5-20250211/
+/Packages/UnitySimpleFileBrowser-1.7.5
 /unity-errors.log
 /unity-full-errors.log
 /custom-images/
+/Assets/Samples/XR Interaction Toolkit
+/Assets/Samples/XR Interaction Toolkit.meta
+
+# Unity IDE files
+*.csproj
+*.sln
+*.suo
+*.user
+*.userprefs
+.vscode/
+.idea/
+.git2/
+*.log
+
