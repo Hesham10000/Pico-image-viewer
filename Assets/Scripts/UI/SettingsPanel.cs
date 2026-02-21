@@ -312,8 +312,19 @@ namespace PicoImageViewer.UI
 
             _settings.LastRootFolder = path;
             ApplyAndSave();
-            WindowManager.Instance?.OpenFolder(path);
-            UpdateStatus($"Opened: {path}");
+
+            if (_settings.Mode == ViewMode.Normal)
+            {
+                // In Normal mode, navigate the FolderBrowserPanel
+                FolderBrowserPanel.Instance?.NavigateTo(path);
+                UpdateStatus($"Browsing: {path}");
+            }
+            else
+            {
+                // In Grid mode, open all images via WindowManager
+                WindowManager.Instance?.OpenFolder(path);
+                UpdateStatus($"Opened grid: {path}");
+            }
         }
 
         private void ApplyAndSave()

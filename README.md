@@ -9,16 +9,25 @@ A standalone XR application for **Pico 4 Ultra** (Pico OS) that lets you browse 
 **Normal Mode (default)** — A qimgv-style image viewer:
 - Browse folders in a world-space file browser panel
 - Click any image to open it in a new floating window
+- Each window has a **control bar** below the image with: close, settings, curvature slider, and resize
+- **Curvature slider** bends the image on a cylinder (0 = flat, 1 = max curve)
+- **Resize button**: click to enter resize mode, then move controller to resize the window
 - Each new window spawns next to the last (right/below in a tiling pattern)
-- Hover over a window and push **joystick down** to show the next image in the folder
-- Push **joystick up** to show the previous image — all within the same window
-- Every window is draggable, resizable, and has the same controls as Grid mode
+- **Thumbstick up/down** while hovering a window cycles to previous/next image in the folder
+- Every window is draggable and resizable
 
-**Grid Mode** — Batch comparison:
+**Grid Mode** — Batch comparison with row-based controls:
 - Select a root folder (e.g., `Paradox/`)
 - App scans all subfolders and spawns one window per image
-- Windows are arranged in a grid: subfolders = rows, images = columns
-- Example: `Folder1/` (2 images) + `Folder2/` (3 images) = 5 windows in 2 rows
+- Windows are arranged in rows: subfolders = rows, images = columns
+- **Images in the same row are placed side by side** with near-zero horizontal spacing (configurable)
+- Each **row** has a shared **control bar** below it with: close row, settings, curvature slider, and resize row
+  - **Close**: closes all images in that row
+  - **Settings**: opens the settings panel
+  - **Curvature slider**: applies curvature to all images in the row
+  - **Resize**: resizes the entire row — all images scale to fill the row's width/height
+- Vertical spacing between rows is controlled by the **Row Spacing** slider in Settings
+- Horizontal spacing between images within a row is controlled by the **Column Spacing** slider in Settings
 
 ### Folder Structure Example
 
@@ -33,21 +42,24 @@ paradox/
     photo3.jpg
 ```
 
-Grid mode spawns **5 draggable, resizable windows**:
-- **Row 1** (Folder1): 2 windows side by side
-- **Row 2** (Folder2): 3 windows side by side
+Grid mode spawns **5 windows** with row-based control bars:
+- **Row 1** (Folder1): 2 images side by side + shared control bar below
+- **Row 2** (Folder2): 3 images side by side + shared control bar below
+- Each row's control bar can close, resize, or adjust curvature for the entire row
 
 ## Features
 
-- **Dual mode**: Normal (file browser + individual windows) and Grid (all-at-once comparison)
-- **Joystick image cycling**: Hover + joystick up/down to flip through folder images in-place
+- **Dual mode**: Normal (file browser + individual windows) and Grid (row-based comparison)
+- **Image curvature**: Adjustable cylindrical curve per image via slider (flat to fully curved)
+- **Control bar per window** (Normal mode): Close, settings, curvature slider, resize
+- **Control bar per row** (Grid mode): Close row, settings, curvature for row, resize row
+- **Joystick image cycling**: Hover + thumbstick up/down to flip through folder images in-place
 - **Folder browser**: Navigable directory tree with back/up/home buttons (Normal mode)
 - **Folder scanning**: Finds `.png`, `.jpg`, `.jpeg`, `.gif` images in subfolders
-- **Grid layout**: Subfolders = rows, images = columns, with configurable spacing
+- **Grid layout**: Subfolders = rows, images = columns, near-zero in-row spacing, configurable row spacing
 - **Draggable windows**: Grab the title bar to move any window in 6DoF
-- **Resizable windows**: Corner handles for resizing, with optional aspect ratio lock
-- **Per-window controls**: Close, reset size, reset position, zoom in/out, fit-to-image
-- **Settings panel**: World-space UI with mode toggle, grid spacing, window defaults, interaction tuning
+- **Resizable windows**: Resize button in control bar + corner handles, with optional aspect ratio lock
+- **Settings panel**: World-space polished UI with mode toggle, spacing controls, window defaults, interaction tuning
 - **Layout persistence**: Save/load window positions per folder
 - **Android file access**: Storage Access Framework picker + manual path entry
 - **Performance**: Async texture loading with LRU cache, configurable max texture size
@@ -345,17 +357,25 @@ This is edge-triggered with a configurable cooldown, so holding the joystick won
 - [ ] Empty subfolders are skipped
 - [ ] Supported formats load correctly: .png, .jpg, .jpeg, .gif
 
-### Window Interaction (both modes)
+### Window Interaction — Normal Mode
 - [ ] Each window displays image preview (contain fit, not cropped)
-- [ ] Title bar shows filename
+- [ ] Control bar appears below each image window
+- [ ] Close button in control bar hides the window
+- [ ] Settings button opens the settings panel
+- [ ] Curvature slider bends the image (0 = flat, 1 = max curve)
+- [ ] Resize button toggles resize mode; controller movement resizes window
+- [ ] Thumbstick up/down cycles to previous/next image in folder
 - [ ] Grabbing title bar moves window in 3D space (6DoF)
-- [ ] Corner handles resize the window
-- [ ] Aspect ratio lock toggle works
-- [ ] Close button hides the window
-- [ ] Reset Size restores default dimensions
-- [ ] Reset Position returns window to grid slot
-- [ ] Zoom in/out changes window size
-- [ ] Fit button adjusts window to match image aspect
+
+### Window Interaction — Grid Mode
+- [ ] Images in same row are side by side with near-zero spacing
+- [ ] Each row has a shared control bar below all images
+- [ ] Row close button closes all images in that row
+- [ ] Row settings button opens settings panel
+- [ ] Row curvature slider applies curvature to all images in the row
+- [ ] Row resize button resizes all images to fill row width/height
+- [ ] Vertical row spacing matches the Row Spacing setting
+- [ ] Horizontal image spacing matches the Column Spacing setting
 
 ### Mode Switching
 - [ ] Mode toggle in settings switches between Normal and Grid

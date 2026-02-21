@@ -23,7 +23,15 @@ namespace PicoImageViewer.UI
         [SerializeField] private RectTransform _titleBar;
         [SerializeField] private RectTransform _imageContainer;
         [SerializeField] private GameObject _loadingIndicator;
+
+        [Header("Control Bar")]
+        [SerializeField] private RectTransform _controlBar;
         [SerializeField] private Button _closeButton;
+        [SerializeField] private Button _settingsButton;
+        [SerializeField] private Slider _curvatureSlider;
+        [SerializeField] private Button _resizeButton;
+
+        [Header("Legacy Buttons (optional)")]
         [SerializeField] private Button _resetSizeButton;
         [SerializeField] private Button _resetPositionButton;
         [SerializeField] private Button _zoomInButton;
@@ -55,6 +63,14 @@ namespace PicoImageViewer.UI
         private const float MinWindowSize = 0.1f;
         private const float MaxWindowSize = 5.0f;
         private const float ZoomStep = 0.1f;
+
+        // Curvature (0 = flat, 1 = max cylindrical curve)
+        private float _curvature;
+        public float Curvature => _curvature;
+
+        // Resize mode: when active, controller movement resizes the window
+        private bool _isResizeMode;
+        public bool IsResizeMode => _isResizeMode;
 
         public ImageData Data => _imageData;
         public string RelativePath => _imageData?.RelativePath;
@@ -147,8 +163,22 @@ namespace PicoImageViewer.UI
 
         private void SetupButtons()
         {
+            // Control bar buttons
             if (_closeButton != null)
                 _closeButton.onClick.AddListener(Hide);
+            if (_settingsButton != null)
+                _settingsButton.onClick.AddListener(OnSettingsClicked);
+            if (_curvatureSlider != null)
+            {
+                _curvatureSlider.minValue = 0f;
+                _curvatureSlider.maxValue = 1f;
+                _curvatureSlider.value = _curvature;
+                _curvatureSlider.onValueChanged.AddListener(OnCurvatureChanged);
+            }
+            if (_resizeButton != null)
+                _resizeButton.onClick.AddListener(ToggleResizeMode);
+
+            // Legacy buttons (still wired if present in prefab)
             if (_resetSizeButton != null)
                 _resetSizeButton.onClick.AddListener(ResetSize);
             if (_resetPositionButton != null)
@@ -390,6 +420,71 @@ namespace PicoImageViewer.UI
 
         #endregion
 
+        #region Control Bar
+
+        private void OnSettingsClicked()
+        {
+            // Find and toggle the SettingsPanel
+            var settingsPanel = FindAnyObjectByType<SettingsPanel>();
+            if (settingsPanel != null)
+                settingsPanel.TogglePanel();
+        }
+
+        private void OnCurvatureChanged(float value)
+        {
+            _curvature = value;
+            ApplyCurvature();
+        }
+
+        /// <summary>
+        /// Set curvature externally (e.g. from a row control bar in grid mode).
+        /// </summary>
+        public void SetCurvature(float value)
+        {
+            _curvature = Mathf.Clamp01(value);
+            if (_curvatureSlider != null)
+                _curvatureSlider.SetValueWithoutNotify(_curvature);
+            ApplyCurvature();
+        }
+
+        private void ApplyCurvature()
+        {
+            // Apply curvature via material property if available.
+            // The RawImage material should use a shader that supports a _Curvature parameter.
+            if (_imageDisplay != null && _imageDisplay.material != null)
+            {
+                if (_imageDisplay.material.HasProperty("_Curvature"))
+                    _imageDisplay.material.SetFloat("_Curvature", _curvature);
+            }
+        }
+
+        private void ToggleResizeMode()
+        {
+            _isResizeMode = !_isResizeMode;
+
+            // Visual feedback: change resize button color when active
+            if (_resizeButton != null)
+            {
+                var img = _resizeButton.GetComponent<Image>();
+                if (img != null)
+                    img.color = _isResizeMode
+                        ? new Color(0.24f, 0.53f, 0.95f, 1f) // accent blue when active
+                        : new Color(0.17f, 0.20f, 0.27f, 1f); // normal dark
+            }
+        }
+
+        /// <summary>
+        /// Called by external resize logic when in resize mode.
+        /// Applies controller movement delta to window size.
+        /// </summary>
+        public void ApplyResizeDelta(float deltaWidth, float deltaHeight)
+        {
+            if (!_isResizeMode) return;
+            Resize(deltaWidth, deltaHeight, _maintainAspectRatio);
+        }
+
+        #endregion
+
         #region Visibility
 
         public void Hide()
@@ -411,7 +506,13 @@ namespace PicoImageViewer.UI
 
         private void OnDestroy()
         {
+            // Control bar
             if (_closeButton != null) _closeButton.onClick.RemoveAllListeners();
+            if (_settingsButton != null) _settingsButton.onClick.RemoveAllListeners();
+            if (_curvatureSlider != null) _curvatureSlider.onValueChanged.RemoveAllListeners();
+            if (_resizeButton != null) _resizeButton.onClick.RemoveAllListeners();
+
+            // Legacy
             if (_resetSizeButton != null) _resetSizeButton.onClick.RemoveAllListeners();
             if (_resetPositionButton != null) _resetPositionButton.onClick.RemoveAllListeners();
             if (_zoomInButton != null) _zoomInButton.onClick.RemoveAllListeners();
