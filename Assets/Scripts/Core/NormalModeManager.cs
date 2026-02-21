@@ -175,7 +175,7 @@ namespace PicoImageViewer.Core
 
                 // Place at eye level (use head Y position, not floor)
                 position = origin + forward * dist;
-                rotation = Quaternion.LookRotation(-forward, Vector3.up);
+                rotation = Quaternion.LookRotation(forward, Vector3.up);
                 return;
             }
 
@@ -187,10 +187,10 @@ namespace PicoImageViewer.Core
             Quaternion lastRot = _lastOpenedWindow.transform.rotation;
             rotation = lastRot;
 
-            // For a canvas facing the user (LookRotation(-forward)):
-            //   rotation * Vector3.left  = user's right direction
+            // For a canvas facing the user (LookRotation(forward)):
+            //   rotation * Vector3.right = user's right direction
             //   rotation * Vector3.down  = world down
-            Vector3 rightDir = lastRot * Vector3.left;
+            Vector3 rightDir = lastRot * Vector3.right;
             Vector3 downDir = Vector3.down; // use world down for consistent vertical tiling
 
             float stepRight = width + spacing;

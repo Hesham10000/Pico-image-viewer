@@ -29,7 +29,7 @@ namespace PicoImageViewer.UI
         [SerializeField] private Button _closeButton;
         [SerializeField] private Button _settingsButton;
         [SerializeField] private Slider _curvatureSlider;
-        [SerializeField] private Button _resizeButton;
+        [SerializeField] private Slider _resizeSlider;
 
         [Header("Legacy Buttons (optional)")]
         [SerializeField] private Button _resetSizeButton;
@@ -68,9 +68,9 @@ namespace PicoImageViewer.UI
         private float _curvature;
         public float Curvature => _curvature;
 
-        // Resize mode: when active, controller movement resizes the window
-        private bool _isResizeMode;
-        public bool IsResizeMode => _isResizeMode;
+        // Resize scale multiplier driven by the resize slider (0.5 = half, 1 = default, 2 = double)
+        private float _resizeScale = 1f;
+        public float ResizeScale => _resizeScale;
 
         public ImageData Data => _imageData;
         public string RelativePath => _imageData?.RelativePath;
@@ -175,8 +175,13 @@ namespace PicoImageViewer.UI
                 _curvatureSlider.value = _curvature;
                 _curvatureSlider.onValueChanged.AddListener(OnCurvatureChanged);
             }
-            if (_resizeButton != null)
-                _resizeButton.onClick.AddListener(ToggleResizeMode);
+            if (_resizeSlider != null)
+            {
+                _resizeSlider.minValue = 0.25f;
+                _resizeSlider.maxValue = 3f;
+                _resizeSlider.value = 1f;
+                _resizeSlider.onValueChanged.AddListener(OnResizeSliderChanged);
+            }
 
             // Legacy buttons (still wired if present in prefab)
             if (_resetSizeButton != null)
@@ -458,29 +463,26 @@ namespace PicoImageViewer.UI
             }
         }
 
-        private void ToggleResizeMode()
+        private void OnResizeSliderChanged(float value)
         {
-            _isResizeMode = !_isResizeMode;
-
-            // Visual feedback: change resize button color when active
-            if (_resizeButton != null)
-            {
-                var img = _resizeButton.GetComponent<Image>();
-                if (img != null)
-                    img.color = _isResizeMode
-                        ? new Color(0.24f, 0.53f, 0.95f, 1f) // accent blue when active
-                        : new Color(0.17f, 0.20f, 0.27f, 1f); // normal dark
-            }
+            _resizeScale = value;
+            // Resize the window relative to its default size
+            float newW = _defaultWidth * _resizeScale;
+            float newH = _defaultHeight * _resizeScale;
+            if (_maintainAspectRatio && _imageAspect > 0)
+                newH = newW / _imageAspect;
+            SetSize(newW, newH);
         }
 
         /// <summary>
-        /// Called by external resize logic when in resize mode.
-        /// Applies controller movement delta to window size.
+        /// Set resize scale externally (e.g. from a row control bar in grid mode).
         /// </summary>
-        public void ApplyResizeDelta(float deltaWidth, float deltaHeight)
+        public void SetResizeScale(float value)
         {
-            if (!_isResizeMode) return;
-            Resize(deltaWidth, deltaHeight, _maintainAspectRatio);
+            _resizeScale = Mathf.Clamp(value, 0.25f, 3f);
+            if (_resizeSlider != null)
+                _resizeSlider.SetValueWithoutNotify(_resizeScale);
+            OnResizeSliderChanged(_resizeScale);
         }
 
         #endregion
@@ -492,8 +494,18 @@ namespace PicoImageViewer.UI
             IsHidden = true;
             gameObject.SetActive(false);
 
+            // Close the settings panel if it was opened from this window
+            var settingsPanel = FindAnyObjectByType<SettingsPanel>();
+            if (settingsPanel != null)
+                settingsPanel.HidePanel();
+
             // Notify NormalModeManager if in normal mode
             NormalModeManager.Instance?.UnregisterWindow(this);
+
+            // Notify parent ImageRow if in grid mode
+            var row = GetComponentInParent<ImageRow>();
+            if (row != null)
+                row.OnChildWindowHidden(this);
         }
 
         public void Show()
@@ -510,7 +522,7 @@ namespace PicoImageViewer.UI
             if (_closeButton != null) _closeButton.onClick.RemoveAllListeners();
             if (_settingsButton != null) _settingsButton.onClick.RemoveAllListeners();
             if (_curvatureSlider != null) _curvatureSlider.onValueChanged.RemoveAllListeners();
-            if (_resizeButton != null) _resizeButton.onClick.RemoveAllListeners();
+            if (_resizeSlider != null) _resizeSlider.onValueChanged.RemoveAllListeners();
 
             // Legacy
             if (_resetSizeButton != null) _resetSizeButton.onClick.RemoveAllListeners();

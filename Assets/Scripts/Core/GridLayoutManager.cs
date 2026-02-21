@@ -54,8 +54,9 @@ namespace PicoImageViewer.Core
             if (forward.sqrMagnitude < 0.01f) forward = Vector3.forward;
             forward.Normalize();
 
-            // Windows face toward the user (opposite of grid forward)
-            return Quaternion.LookRotation(-forward, Vector3.up);
+            // Canvas content is visible from its -Z side, so canvas +Z must
+            // point AWAY from the user (same as the user's forward direction).
+            return Quaternion.LookRotation(forward, Vector3.up);
         }
 
         /// <summary>
@@ -70,8 +71,8 @@ namespace PicoImageViewer.Core
             Quaternion rotation = ComputeGridRotation(headTransform);
 
             // Grid local axes (in world space)
-            Vector3 rightDir = rotation * Vector3.left;  // columns go right
-            Vector3 downDir = rotation * Vector3.down;   // rows go down
+            Vector3 rightDir = rotation * Vector3.right;  // columns go right
+            Vector3 downDir = rotation * Vector3.down;    // rows go down
 
             float windowW = _settings.DefaultWindowWidth * _settings.WindowScaleMultiplier;
             float windowH = _settings.DefaultWindowHeight * _settings.WindowScaleMultiplier;
@@ -115,7 +116,7 @@ namespace PicoImageViewer.Core
             Vector3 origin = ComputeGridOrigin(headTransform);
             Quaternion rotation = ComputeGridRotation(headTransform);
 
-            Vector3 rightDir = rotation * Vector3.left;
+            Vector3 rightDir = rotation * Vector3.right;
             Vector3 downDir = rotation * Vector3.down;
 
             float windowW = _settings.DefaultWindowWidth * _settings.WindowScaleMultiplier;

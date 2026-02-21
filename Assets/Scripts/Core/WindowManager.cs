@@ -9,6 +9,7 @@ namespace PicoImageViewer.Core
     /// <summary>
     /// Central manager: orchestrates folder scanning, window spawning/despawning,
     /// layout persistence, and re-scanning.
+    /// In Grid mode, images are grouped into ImageRow containers (one per subfolder).
     /// </summary>
     public class WindowManager : MonoBehaviour
     {
@@ -24,6 +25,7 @@ namespace PicoImageViewer.Core
         private GridLayoutManager _gridLayout;
         private List<FolderData> _currentFolders = new List<FolderData>();
         private List<ImageWindow> _activeWindows = new List<ImageWindow>();
+        private List<ImageRow> _activeRows = new List<ImageRow>();
         private string _currentRootFolder;
 
         // Events
@@ -101,6 +103,7 @@ namespace PicoImageViewer.Core
 
         /// <summary>
         /// Open a folder: scan, spawn windows, apply saved layouts.
+        /// In grid mode, groups images into ImageRow containers per subfolder.
         /// </summary>
         public void OpenFolder(string rootPath)
         {
@@ -137,19 +140,50 @@ namespace PicoImageViewer.Core
 
             var slots = _gridLayout.ComputeSlots(_currentFolders, _headTransform);
 
-            // Spawn windows
+            // Build a lookup: rowIndex -> list of slots
+            var slotsByRow = new Dictionary<int, List<GridSlot>>();
             foreach (var slot in slots)
             {
-                SpawnWindow(slot, savedLayout);
+                int row = slot.Image.RowIndex;
+                if (!slotsByRow.ContainsKey(row))
+                    slotsByRow[row] = new List<GridSlot>();
+                slotsByRow[row].Add(slot);
+            }
+
+            // Spawn: one ImageRow per folder/row, ImageWindows inside each row
+            foreach (var folder in _currentFolders)
+            {
+                if (!slotsByRow.ContainsKey(folder.RowIndex)) continue;
+                var rowSlots = slotsByRow[folder.RowIndex];
+                if (rowSlots.Count == 0) continue;
+
+                // Create the row container GameObject
+                var rowGO = new GameObject($"Row_{folder.FolderName}");
+                rowGO.transform.SetParent(_windowContainer, false);
+                // Position row at the first slot's position (row-level)
+                rowGO.transform.position = rowSlots[0].Position;
+                rowGO.transform.rotation = rowSlots[0].Rotation;
+
+                var imageRow = rowGO.AddComponent<ImageRow>();
+                float windowW = _settings.DefaultWindowWidth * _settings.WindowScaleMultiplier;
+                float windowH = _settings.DefaultWindowHeight * _settings.WindowScaleMultiplier;
+                imageRow.Initialize(folder, windowW, windowH);
+                _activeRows.Add(imageRow);
+
+                // Spawn individual image windows inside the row
+                foreach (var slot in rowSlots)
+                {
+                    SpawnWindowInRow(slot, savedLayout, imageRow);
+                }
             }
 
             OnScanComplete?.Invoke();
             OnWindowCountChanged?.Invoke(_activeWindows.Count);
 
-            Debug.Log($"[WindowManager] Opened {rootPath}: {_activeWindows.Count} windows");
+            Debug.Log($"[WindowManager] Opened {rootPath}: {_activeWindows.Count} windows in {_activeRows.Count} rows");
         }
 
-        private void SpawnWindow(GridSlot slot, FolderLayoutData savedLayout)
+        private void SpawnWindowInRow(GridSlot slot, FolderLayoutData savedLayout, ImageRow row)
         {
             if (_imageWindowPrefab == null)
             {
@@ -157,7 +191,8 @@ namespace PicoImageViewer.Core
                 return;
             }
 
-            GameObject go = Instantiate(_imageWindowPrefab, _windowContainer);
+            // Spawn under the row's transform so ImageWindow can find ImageRow via GetComponentInParent
+            GameObject go = Instantiate(_imageWindowPrefab, row.transform);
             var window = go.GetComponent<ImageWindow>();
             if (window == null)
             {
@@ -175,6 +210,7 @@ namespace PicoImageViewer.Core
                 window.ApplyLayoutOverride(savedEntry);
             }
 
+            row.AddChildWindow(window);
             _activeWindows.Add(window);
         }
 
@@ -197,6 +233,15 @@ namespace PicoImageViewer.Core
         /// </summary>
         public void CloseAllWindows()
         {
+            // Destroy row containers (which also destroys child windows)
+            foreach (var row in _activeRows)
+            {
+                if (row != null && row.gameObject != null)
+                    Destroy(row.gameObject);
+            }
+            _activeRows.Clear();
+
+            // Also destroy any orphaned windows not in a row
             foreach (var window in _activeWindows)
             {
                 if (window != null && window.gameObject != null)
@@ -286,6 +331,7 @@ namespace PicoImageViewer.Core
         public AppSettings GetSettings() => _settings;
         public List<FolderData> GetCurrentFolders() => _currentFolders;
         public List<ImageWindow> GetActiveWindows() => _activeWindows;
+        public List<ImageRow> GetActiveRows() => _activeRows;
         public string GetCurrentRootFolder() => _currentRootFolder;
         public ViewMode CurrentMode => _settings.Mode;
 

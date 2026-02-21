@@ -83,6 +83,10 @@ namespace PicoImageViewer.UI
             _settings = AppSettings.Load();
             PopulateUI();
             BindEvents();
+
+            // Hide the panel content at start — only shown via image settings icon
+            if (_panelContent != null)
+                _panelContent.SetActive(false);
         }
 
         private void PopulateUI()
@@ -343,6 +347,18 @@ namespace PicoImageViewer.UI
         {
             if (_panelContent != null)
                 _panelContent.SetActive(!_panelContent.activeSelf);
+        }
+
+        public void HidePanel()
+        {
+            if (_panelContent != null)
+                _panelContent.SetActive(false);
+        }
+
+        public void ShowPanel()
+        {
+            if (_panelContent != null)
+                _panelContent.SetActive(true);
         }
 
         private void SwitchMode(ViewMode mode)
