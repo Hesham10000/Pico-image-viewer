@@ -61,47 +61,64 @@ namespace PicoImageViewer.Core
 
         /// <summary>
         /// Computes grid slot positions for all images across all folders.
-        /// Returns a list of (ImageData, worldPosition) tuples.
+        /// Images in each row are arranged in a curved arc around the user,
+        /// creating a panoramic cylinder layout natural for VR viewing.
         /// </summary>
         public List<GridSlot> ComputeSlots(List<FolderData> folders, Transform headTransform)
         {
             var slots = new List<GridSlot>();
 
-            Vector3 origin = ComputeGridOrigin(headTransform);
-            Quaternion rotation = ComputeGridRotation(headTransform);
-
-            // Grid local axes (in world space)
-            Vector3 rightDir = rotation * Vector3.right;  // columns go right
-            Vector3 downDir = rotation * Vector3.down;    // rows go down
-
             float windowW = _settings.DefaultWindowWidth * _settings.WindowScaleMultiplier;
             float windowH = _settings.DefaultWindowHeight * _settings.WindowScaleMultiplier;
             float colSpacing = _settings.ColumnSpacing;
             float rowSpacing = _settings.RowSpacing;
+            float radius = _settings.GridForwardOffset;
 
-            // Total column step = window width + spacing
-            float colStep = windowW + colSpacing;
-            float rowStep = windowH + rowSpacing;
+            // Head position and forward direction (flattened to horizontal)
+            Vector3 headPos = headTransform.position;
+            Vector3 forward = headTransform.forward;
+            forward.y = 0f;
+            if (forward.sqrMagnitude < 0.01f) forward = Vector3.forward;
+            forward.Normalize();
 
-            Debug.Log($"[GridLayout] origin={origin}, rotation={rotation.eulerAngles}, " +
-                      $"rightDir={rightDir}, downDir={downDir}, " +
-                      $"windowSize={windowW}x{windowH}, head={headTransform.position}");
+            // Angular step per image: how many radians each image+spacing occupies on the arc
+            float arcPerImage = 2f * Mathf.Atan2((windowW + colSpacing) * 0.5f, radius);
+
+            Debug.Log($"[GridLayout] Curved arc: radius={radius}, arcPerImage={arcPerImage * Mathf.Rad2Deg}°, " +
+                      $"windowSize={windowW}x{windowH}, head={headPos}");
 
             for (int r = 0; r < folders.Count; r++)
             {
                 var folder = folders[r];
-                for (int c = 0; c < folder.Images.Count; c++)
+                int imageCount = folder.Images.Count;
+
+                // Center the row: total arc angle for this row
+                float totalArcAngle = (imageCount - 1) * arcPerImage;
+                float startAngle = -totalArcAngle * 0.5f;
+
+                // Row Y position: eye level + up offset, then step down per row
+                float yPos = headPos.y + _settings.GridUpOffset - r * (windowH + rowSpacing);
+
+                for (int c = 0; c < imageCount; c++)
                 {
-                    // Compute position: origin + column offset to the right + row offset downward
-                    Vector3 pos = origin
-                        + rightDir * (c * colStep)
-                        + downDir * (r * rowStep);
+                    float angle = startAngle + c * arcPerImage;
+
+                    // Rotate the forward direction by this angle around world up
+                    Quaternion arcRot = Quaternion.AngleAxis(angle * Mathf.Rad2Deg, Vector3.up);
+                    Vector3 dir = arcRot * forward;
+
+                    // Position on the arc at the given radius
+                    Vector3 pos = new Vector3(headPos.x, yPos, headPos.z)
+                                  + dir * radius;
+
+                    // Window faces the user (look direction = dir, so canvas front faces -dir)
+                    Quaternion rot = Quaternion.LookRotation(dir, Vector3.up);
 
                     slots.Add(new GridSlot
                     {
                         Image = folder.Images[c],
                         Position = pos,
-                        Rotation = rotation,
+                        Rotation = rot,
                         Width = windowW,
                         Height = windowH
                     });
@@ -112,26 +129,37 @@ namespace PicoImageViewer.Core
         }
 
         /// <summary>
-        /// Computes the grid slot for a single image given its row/col indices.
-        /// Used for "reset position" on individual windows.
+        /// Computes the grid slot for a single image given its row/col indices
+        /// and the total number of images in that row (needed for arc centering).
         /// </summary>
-        public GridSlot ComputeSlot(int row, int col, Transform headTransform)
+        public GridSlot ComputeSlot(int row, int col, int imagesInRow, Transform headTransform)
         {
-            Vector3 origin = ComputeGridOrigin(headTransform);
-            Quaternion rotation = ComputeGridRotation(headTransform);
-
-            Vector3 rightDir = rotation * Vector3.right;
-            Vector3 downDir = rotation * Vector3.down;
-
             float windowW = _settings.DefaultWindowWidth * _settings.WindowScaleMultiplier;
             float windowH = _settings.DefaultWindowHeight * _settings.WindowScaleMultiplier;
-            float colStep = windowW + _settings.ColumnSpacing;
-            float rowStep = windowH + _settings.RowSpacing;
+            float radius = _settings.GridForwardOffset;
+
+            Vector3 headPos = headTransform.position;
+            Vector3 forward = headTransform.forward;
+            forward.y = 0f;
+            if (forward.sqrMagnitude < 0.01f) forward = Vector3.forward;
+            forward.Normalize();
+
+            float arcPerImage = 2f * Mathf.Atan2((windowW + _settings.ColumnSpacing) * 0.5f, radius);
+            float totalArcAngle = (imagesInRow - 1) * arcPerImage;
+            float startAngle = -totalArcAngle * 0.5f;
+            float angle = startAngle + col * arcPerImage;
+
+            float yPos = headPos.y + _settings.GridUpOffset - row * (windowH + _settings.RowSpacing);
+
+            Quaternion arcRot = Quaternion.AngleAxis(angle * Mathf.Rad2Deg, Vector3.up);
+            Vector3 dir = arcRot * forward;
+            Vector3 pos = new Vector3(headPos.x, yPos, headPos.z) + dir * radius;
+            Quaternion rot = Quaternion.LookRotation(dir, Vector3.up);
 
             return new GridSlot
             {
-                Position = origin + rightDir * (col * colStep) + downDir * (row * rowStep),
-                Rotation = rotation,
+                Position = pos,
+                Rotation = rot,
                 Width = windowW,
                 Height = windowH
             };

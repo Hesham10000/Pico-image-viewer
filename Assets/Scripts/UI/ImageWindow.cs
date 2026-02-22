@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Rendering;
 using TMPro;
 using PicoImageViewer.Core;
 using PicoImageViewer.Data;
@@ -67,6 +68,13 @@ namespace PicoImageViewer.UI
         // Curvature (0 = flat, 1 = max cylindrical curve)
         private float _curvature;
         public float Curvature => _curvature;
+
+        // 3D curved mesh objects (created at runtime for real VR curvature)
+        private GameObject _curvedMeshGO;
+        private MeshFilter _curvedMeshFilter;
+        private MeshRenderer _curvedMeshRenderer;
+        private Material _curvedMeshMaterial;
+        private const int CurveMeshSegments = 32;
 
         // Resize scale multiplier driven by the resize slider (0.5 = half, 1 = default, 2 = double)
         private float _resizeScale = 1f;
@@ -244,6 +252,10 @@ namespace PicoImageViewer.UI
                 _imageDisplay.color = Color.white;
             }
 
+            // Also update curved mesh material if it exists
+            if (_curvedMeshMaterial != null)
+                _curvedMeshMaterial.mainTexture = texture;
+
             _imageAspect = (float)origWidth / Mathf.Max(origHeight, 1);
 
             Debug.Log($"[ImageWindow] Texture loaded '{_imageData.FileName}' " +
@@ -287,8 +299,10 @@ namespace PicoImageViewer.UI
                 );
             }
 
-            // Ensure localScale stays at the original prefab scale
-            transform.localScale = new Vector3(_canvasScale, _canvasScale, _canvasScale);
+            // Apply uniform scaling: base canvas scale * resize multiplier.
+            // This scales the ENTIRE window (image + control bar + text) uniformly.
+            float effectiveScale = _canvasScale * _resizeScale;
+            transform.localScale = new Vector3(effectiveScale, effectiveScale, effectiveScale);
         }
 
 
@@ -484,24 +498,133 @@ namespace PicoImageViewer.UI
 
         private void ApplyCurvature()
         {
-            // Apply curvature via material property if available.
-            // The RawImage material should use a shader that supports a _Curvature parameter.
-            if (_imageDisplay != null && _imageDisplay.material != null)
+            if (_curvature < 0.01f)
             {
-                if (_imageDisplay.material.HasProperty("_Curvature"))
-                    _imageDisplay.material.SetFloat("_Curvature", _curvature);
+                // Flat: show RawImage, hide curved mesh
+                if (_imageDisplay != null)
+                    _imageDisplay.gameObject.SetActive(true);
+                if (_curvedMeshGO != null)
+                    _curvedMeshGO.SetActive(false);
+                return;
             }
+
+            // Curved: hide RawImage, show 3D curved mesh
+            if (_imageDisplay != null)
+                _imageDisplay.gameObject.SetActive(false);
+
+            EnsureCurvedMeshObjects();
+            GenerateCurvedMesh();
+
+            if (_curvedMeshGO != null)
+                _curvedMeshGO.SetActive(true);
+        }
+
+        /// <summary>
+        /// Create the child GameObject for the curved 3D mesh if it doesn't exist.
+        /// </summary>
+        private void EnsureCurvedMeshObjects()
+        {
+            if (_curvedMeshGO != null) return;
+
+            _curvedMeshGO = new GameObject("CurvedMesh");
+            _curvedMeshGO.transform.SetParent(transform, false);
+            _curvedMeshGO.transform.localPosition = Vector3.zero;
+            _curvedMeshGO.transform.localRotation = Quaternion.identity;
+            _curvedMeshGO.transform.localScale = Vector3.one;
+
+            _curvedMeshFilter = _curvedMeshGO.AddComponent<MeshFilter>();
+            _curvedMeshRenderer = _curvedMeshGO.AddComponent<MeshRenderer>();
+
+            // Create an Unlit material for the curved mesh
+            var shader = Shader.Find("Unlit/Texture");
+            if (shader == null) shader = Shader.Find("UI/Default");
+            _curvedMeshMaterial = new Material(shader);
+            _curvedMeshMaterial.renderQueue = (int)RenderQueue.Transparent;
+            _curvedMeshRenderer.material = _curvedMeshMaterial;
+            _curvedMeshRenderer.shadowCastingMode = ShadowCastingMode.Off;
+            _curvedMeshRenderer.receiveShadows = false;
+
+            // Copy texture from RawImage if already loaded
+            if (_imageDisplay != null && _imageDisplay.texture != null)
+                _curvedMeshMaterial.mainTexture = _imageDisplay.texture;
+        }
+
+        /// <summary>
+        /// Generate (or regenerate) the cylindrical curved mesh.
+        /// The mesh is in canvas-unit local space (child of the Canvas transform).
+        /// Curvature 0→1 maps to arc angle 0→180°.
+        /// The mesh curves TOWARD the viewer (edges bend toward -Z).
+        /// </summary>
+        private void GenerateCurvedMesh()
+        {
+            if (_curvedMeshFilter == null) return;
+
+            float canvasW = _currentWidth / _canvasScale;
+            float canvasH = _currentHeight / _canvasScale;
+            float arcAngleRad = _curvature * Mathf.PI; // 0 to π
+
+            if (arcAngleRad < 0.001f) return;
+
+            float radius = canvasW / arcAngleRad;
+
+            var vertices = new Vector3[(CurveMeshSegments + 1) * 2];
+            var uvs = new Vector2[(CurveMeshSegments + 1) * 2];
+            var triangles = new int[CurveMeshSegments * 6];
+
+            for (int x = 0; x <= CurveMeshSegments; x++)
+            {
+                float u = (float)x / CurveMeshSegments;
+                float angle = (u - 0.5f) * arcAngleRad;
+
+                float px = radius * Mathf.Sin(angle);
+                // Z curves toward viewer (-Z). At center (angle=0): pz=0.
+                float pz = radius * (Mathf.Cos(angle) - 1f);
+
+                int vi = x * 2;
+                // Bottom vertex
+                vertices[vi] = new Vector3(px, -canvasH * 0.5f, pz);
+                uvs[vi] = new Vector2(u, 0f);
+                // Top vertex
+                vertices[vi + 1] = new Vector3(px, canvasH * 0.5f, pz);
+                uvs[vi + 1] = new Vector2(u, 1f);
+            }
+
+            for (int x = 0; x < CurveMeshSegments; x++)
+            {
+                int vi = x * 2;
+                int ti = x * 6;
+                // Two triangles per quad, wound so front face points toward viewer (-Z side)
+                triangles[ti + 0] = vi;
+                triangles[ti + 1] = vi + 1;
+                triangles[ti + 2] = vi + 2;
+                triangles[ti + 3] = vi + 2;
+                triangles[ti + 4] = vi + 1;
+                triangles[ti + 5] = vi + 3;
+            }
+
+            var mesh = _curvedMeshFilter.mesh;
+            if (mesh == null)
+                mesh = new Mesh();
+            mesh.Clear();
+            mesh.name = "CurvedImage";
+            mesh.vertices = vertices;
+            mesh.uv = uvs;
+            mesh.triangles = triangles;
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            _curvedMeshFilter.mesh = mesh;
+
+            // Update texture on curved mesh material
+            if (_curvedMeshMaterial != null && _imageDisplay != null && _imageDisplay.texture != null)
+                _curvedMeshMaterial.mainTexture = _imageDisplay.texture;
         }
 
         private void OnResizeSliderChanged(float value)
         {
             _resizeScale = value;
-            // Resize the window relative to its default size
-            float newW = _defaultWidth * _resizeScale;
-            float newH = _defaultHeight * _resizeScale;
-            if (_maintainAspectRatio && _imageAspect > 0)
-                newH = newW / _imageAspect;
-            SetSize(newW, newH);
+            // Uniform scale: resize the entire window (image + control bar + text)
+            // by changing the transform scale, not the canvas dimensions.
+            ApplySize();
         }
 
         /// <summary>
@@ -560,6 +683,10 @@ namespace PicoImageViewer.UI
             if (_zoomOutButton != null) _zoomOutButton.onClick.RemoveAllListeners();
             if (_fitButton != null) _fitButton.onClick.RemoveAllListeners();
             if (_aspectToggleButton != null) _aspectToggleButton.onClick.RemoveAllListeners();
+
+            // Curved mesh cleanup
+            if (_curvedMeshMaterial != null)
+                Destroy(_curvedMeshMaterial);
         }
     }
 }

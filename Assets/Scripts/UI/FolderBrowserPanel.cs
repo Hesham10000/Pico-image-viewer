@@ -489,10 +489,24 @@ namespace PicoImageViewer.UI
                 imageData = new ImageData(imagePath, folderPath, folderName, 0, 0);
             }
 
-            // Delegate to NormalModeManager for window spawning
-            NormalModeManager.Instance?.OpenImage(imageData, folderImages);
+            // Find NormalModeManager - try Instance first, then scene search
+            var nmm = NormalModeManager.Instance;
+            if (nmm == null)
+            {
+                nmm = FindAnyObjectByType<NormalModeManager>();
+            }
 
-            UpdateStatus($"Opened: {imageData.FileName}");
+            if (nmm != null)
+            {
+                nmm.OpenImage(imageData, folderImages);
+                UpdateStatus($"Opened: {imageData.FileName}");
+            }
+            else
+            {
+                Debug.LogError("[FolderBrowser] NormalModeManager not found in scene! " +
+                               "Add a GameObject with NormalModeManager component.");
+                UpdateStatus("Error: NormalModeManager missing from scene");
+            }
         }
 
         private void NavigateUp()
