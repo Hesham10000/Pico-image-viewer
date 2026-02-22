@@ -211,6 +211,9 @@ namespace PicoImageViewer.Core
                 window.ApplyLayoutOverride(savedEntry);
             }
 
+            // Ensure newly spawned windows are always visible
+            window.Show();
+
             window.SetParentRow(row);
             row.AddChildWindow(window);
             _activeWindows.Add(window);

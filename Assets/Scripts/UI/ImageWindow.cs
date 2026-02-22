@@ -154,8 +154,9 @@ namespace PicoImageViewer.UI
                 _canvasScale = 0.001f; // reset to standard VR canvas scale
             ApplySize();
 
-            if (entry.IsHidden)
-                Hide();
+            // NOTE: We intentionally do NOT restore IsHidden here.
+            // Freshly spawned windows should always start visible.
+            // The user can close them manually if desired.
         }
 
         /// <summary>
