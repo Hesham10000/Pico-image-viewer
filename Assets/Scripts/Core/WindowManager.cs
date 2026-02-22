@@ -50,11 +50,10 @@ namespace PicoImageViewer.Core
             // Auto-discover references if not assigned
             AutoDiscoverReferences();
 
-            // Only auto-open in grid mode; normal mode uses the folder browser
-            if (_settings.Mode == ViewMode.Grid && !string.IsNullOrEmpty(_settings.LastRootFolder))
-            {
-                OpenFolder(_settings.LastRootFolder);
-            }
+            // NOTE: Do NOT auto-open here. AppBootstrap.InitializeApp() handles
+            // the initial folder open after permissions are granted. Opening here
+            // causes a double-open race where the first batch of windows is destroyed
+            // while their texture callbacks are still pending.
         }
 
         private void AutoDiscoverReferences()
@@ -191,8 +190,10 @@ namespace PicoImageViewer.Core
                 return;
             }
 
-            // Spawn under the row's transform so ImageWindow can find ImageRow via GetComponentInParent
-            GameObject go = Instantiate(_imageWindowPrefab, row.transform);
+            // Spawn under the window container first (not directly under row,
+            // because the ImageWindow Canvas needs its own world-space transform).
+            // We register with the row logically but keep the window at scene root level.
+            GameObject go = Instantiate(_imageWindowPrefab, _windowContainer);
             var window = go.GetComponent<ImageWindow>();
             if (window == null)
             {
@@ -210,6 +211,7 @@ namespace PicoImageViewer.Core
                 window.ApplyLayoutOverride(savedEntry);
             }
 
+            window.SetParentRow(row);
             row.AddChildWindow(window);
             _activeWindows.Add(window);
         }

@@ -72,10 +72,21 @@ namespace PicoImageViewer.UI
         private float _resizeScale = 1f;
         public float ResizeScale => _resizeScale;
 
+        // Reference to parent row in grid mode (set by WindowManager)
+        private ImageRow _parentRow;
+
         public ImageData Data => _imageData;
         public string RelativePath => _imageData?.RelativePath;
         public bool IsHidden { get; private set; }
         public List<ImageData> SiblingImages => _siblingImages;
+
+        /// <summary>
+        /// Set the parent ImageRow (called by WindowManager in grid mode).
+        /// </summary>
+        public void SetParentRow(ImageRow row)
+        {
+            _parentRow = row;
+        }
 
         #region Initialization
 
@@ -204,6 +215,10 @@ namespace PicoImageViewer.UI
 
         private void OnTextureLoaded(Texture2D texture, int origWidth, int origHeight)
         {
+            // Guard: this callback may fire after the window has been destroyed
+            // (e.g. if the folder was re-opened while textures were still loading).
+            if (this == null) return;
+
             SetLoadingState(false);
             _isTextureLoaded = texture != null;
 
@@ -245,6 +260,9 @@ namespace PicoImageViewer.UI
 
         private void ApplySize()
         {
+            // Guard against being called on a destroyed window
+            if (this == null) return;
+
             // Convert meters to canvas units (e.g. 0.5m / 0.001 = 500 units).
             // This preserves the prefab's original localScale (0.001) so child UI
             // elements remain correctly sized.
@@ -503,9 +521,8 @@ namespace PicoImageViewer.UI
             NormalModeManager.Instance?.UnregisterWindow(this);
 
             // Notify parent ImageRow if in grid mode
-            var row = GetComponentInParent<ImageRow>();
-            if (row != null)
-                row.OnChildWindowHidden(this);
+            if (_parentRow != null)
+                _parentRow.OnChildWindowHidden(this);
         }
 
         public void Show()
