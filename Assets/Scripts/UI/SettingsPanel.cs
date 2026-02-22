@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.InputSystem;
 using PicoImageViewer.Core;
 using PicoImageViewer.Data;
 using PicoImageViewer.Android;
@@ -77,16 +78,33 @@ namespace PicoImageViewer.UI
         [SerializeField] private GameObject _panelContent;
 
         private AppSettings _settings;
+        private Canvas _canvas;
+        private GraphicRaycaster _raycaster;
+        private bool _isVisible;
+        private InputAction _toggleSettingsAction;
 
         private void Start()
         {
             _settings = AppSettings.Load();
+
+            // Cache canvas references for show/hide (disabling Canvas hides everything
+            // including the background, while keeping the MonoBehaviour findable)
+            _canvas = GetComponent<Canvas>();
+            _raycaster = GetComponent<GraphicRaycaster>();
+
             PopulateUI();
             BindEvents();
 
-            // Hide the panel content at start — only shown via image settings icon
-            if (_panelContent != null)
-                _panelContent.SetActive(false);
+            // Set up A button (primaryButton) on right controller to toggle settings.
+            // This works with Pico controllers, Quest controllers, and gamepads.
+            _toggleSettingsAction = new InputAction("ToggleSettings", InputActionType.Button);
+            _toggleSettingsAction.AddBinding("<XRController>{RightHand}/primaryButton");
+            _toggleSettingsAction.AddBinding("<Gamepad>/buttonSouth");
+            _toggleSettingsAction.performed += _ => TogglePanel();
+            _toggleSettingsAction.Enable();
+
+            // Hide at start — only shown via settings icon or A button
+            SetPanelVisible(false);
         }
 
         private void PopulateUI()
@@ -345,21 +363,42 @@ namespace PicoImageViewer.UI
 
         public void TogglePanel()
         {
-            if (_panelContent != null)
-                _panelContent.SetActive(!_panelContent.activeSelf);
+            SetPanelVisible(!_isVisible);
         }
 
         public void HidePanel()
         {
-            if (_panelContent != null)
-                _panelContent.SetActive(false);
+            SetPanelVisible(false);
         }
 
         public void ShowPanel()
         {
-            if (_panelContent != null)
-                _panelContent.SetActive(true);
+            SetPanelVisible(true);
         }
+
+        /// <summary>
+        /// Show or hide the entire settings panel by enabling/disabling the Canvas.
+        /// The MonoBehaviour stays active so it can still be found via FindAnyObjectByType
+        /// and respond to A-button input.
+        /// </summary>
+        private void SetPanelVisible(bool visible)
+        {
+            _isVisible = visible;
+
+            // Disable the Canvas component so nothing renders (including background)
+            if (_canvas != null)
+                _canvas.enabled = visible;
+
+            // Disable raycasting when hidden
+            if (_raycaster != null)
+                _raycaster.enabled = visible;
+
+            // Also toggle _panelContent if assigned (belt-and-suspenders)
+            if (_panelContent != null)
+                _panelContent.SetActive(visible);
+        }
+
+        public bool IsPanelVisible => _isVisible;
 
         private void SwitchMode(ViewMode mode)
         {
@@ -400,6 +439,13 @@ namespace PicoImageViewer.UI
 
         private void OnDestroy()
         {
+            // Cleanup A-button action
+            if (_toggleSettingsAction != null)
+            {
+                _toggleSettingsAction.Disable();
+                _toggleSettingsAction.Dispose();
+            }
+
             // Cleanup listeners
             if (_normalModeButton != null) _normalModeButton.onClick.RemoveAllListeners();
             if (_gridModeButton != null) _gridModeButton.onClick.RemoveAllListeners();

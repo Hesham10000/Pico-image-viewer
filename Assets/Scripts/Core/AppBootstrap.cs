@@ -152,13 +152,27 @@ namespace PicoImageViewer.Core
             OnModeChanged(settings.Mode);
 
             // In Grid mode, auto-open last folder
+            bool hasContent = false;
             if (settings.Mode == ViewMode.Grid && !string.IsNullOrEmpty(settings.LastRootFolder))
             {
                 _windowManager?.OpenFolder(settings.LastRootFolder);
+                // Check if any windows were actually created
+                hasContent = _windowManager != null && _windowManager.GetActiveWindows().Count > 0;
             }
-            // In Normal mode, the FolderBrowserPanel handles its own initialization
+            else if (settings.Mode == ViewMode.Normal)
+            {
+                // In Normal mode, the FolderBrowserPanel handles its own initialization
+                // Consider it "has content" if folder browser is active
+                hasContent = _folderBrowserPanel != null;
+            }
 
-            Debug.Log($"[AppBootstrap] Initialization complete (mode: {settings.Mode})");
+            // If no content to display, auto-show settings so user can pick a folder
+            if (!hasContent && _settingsPanel != null)
+            {
+                _settingsPanel.ShowPanel();
+            }
+
+            Debug.Log($"[AppBootstrap] Initialization complete (mode: {settings.Mode}, hasContent: {hasContent})");
         }
 
         /// <summary>
