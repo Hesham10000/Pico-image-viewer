@@ -83,6 +83,10 @@ namespace PicoImageViewer.Core
             float colStep = windowW + colSpacing;
             float rowStep = windowH + rowSpacing;
 
+            Debug.Log($"[GridLayout] origin={origin}, rotation={rotation.eulerAngles}, " +
+                      $"rightDir={rightDir}, downDir={downDir}, " +
+                      $"windowSize={windowW}x{windowH}, head={headTransform.position}");
+
             for (int r = 0; r < folders.Count; r++)
             {
                 var folder = folders[r];

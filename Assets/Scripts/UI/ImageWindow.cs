@@ -117,6 +117,13 @@ namespace PicoImageViewer.UI
             transform.rotation = gridRot;
             ApplySize();
 
+            Debug.Log($"[ImageWindow] Initialized '{imageData.FileName}' at " +
+                      $"pos={transform.position}, rot={transform.rotation.eulerAngles}, " +
+                      $"scale={transform.localScale}, sizeDelta={GetComponent<RectTransform>()?.sizeDelta}, " +
+                      $"canvasScale={_canvasScale}, size={_currentWidth}x{_currentHeight}m, " +
+                      $"canvas={GetComponent<Canvas>()?.enabled}, " +
+                      $"imageDisplay={(_imageDisplay != null ? "OK" : "NULL")}");
+
             // Wire up buttons
             SetupButtons();
 
@@ -237,6 +244,10 @@ namespace PicoImageViewer.UI
             }
 
             _imageAspect = (float)origWidth / Mathf.Max(origHeight, 1);
+
+            Debug.Log($"[ImageWindow] Texture loaded '{_imageData.FileName}' " +
+                      $"{origWidth}x{origHeight}, pos={transform.position}, " +
+                      $"active={gameObject.activeSelf}, display={_imageDisplay?.gameObject.activeSelf}");
 
             // Auto-fit aspect if enabled
             var settings = AppSettings.Load();
