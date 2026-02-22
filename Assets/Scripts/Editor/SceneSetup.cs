@@ -68,6 +68,11 @@ namespace PicoImageViewer.Editor
             if (joystickNavGO.GetComponent<Interaction.JoystickImageNavigator>() == null)
                 joystickNavGO.AddComponent<Interaction.JoystickImageNavigator>();
 
+            // Controller Resize Handler (grip + trigger + thumbstick to resize)
+            var resizeHandlerGO = FindOrCreateChild(managers, "ControllerResizeHandler");
+            if (resizeHandlerGO.GetComponent<Interaction.ControllerResizeHandler>() == null)
+                resizeHandlerGO.AddComponent<Interaction.ControllerResizeHandler>();
+
             // Create App Bootstrap
             var bootstrapGO = FindOrCreate("[AppBootstrap]");
             if (bootstrapGO.GetComponent<Core.AppBootstrap>() == null)

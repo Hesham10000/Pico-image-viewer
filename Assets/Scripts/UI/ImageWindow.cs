@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Rendering;
+using UnityEngine.XR.Interaction.Toolkit.UI;
 using TMPro;
 using PicoImageViewer.Core;
 using PicoImageViewer.Data;
@@ -76,6 +77,9 @@ namespace PicoImageViewer.UI
         private Material _curvedMeshMaterial;
         private const int CurveMeshSegments = 32;
 
+        // Original control bar Z position (for restoring when curvature is removed)
+        private float _controlBarOriginalZ;
+
         // Resize scale multiplier driven by the resize slider (0.5 = half, 1 = default, 2 = double)
         private float _resizeScale = 1f;
         public float ResizeScale => _resizeScale;
@@ -131,6 +135,16 @@ namespace PicoImageViewer.UI
                       $"canvasScale={_canvasScale}, size={_currentWidth}x{_currentHeight}m, " +
                       $"canvas={GetComponent<Canvas>()?.enabled}, " +
                       $"imageDisplay={(_imageDisplay != null ? "OK" : "NULL")}");
+
+            // Auto-discover control bar if not assigned
+            AutoDiscoverControlBar();
+
+            // Store original control bar position for curvature reset
+            if (_controlBar != null)
+                _controlBarOriginalZ = _controlBar.localPosition.z;
+
+            // Ensure Canvas has TrackedDeviceGraphicRaycaster for XR interaction
+            EnsureXRGraphicRaycaster();
 
             // Wire up buttons
             SetupButtons();
@@ -202,13 +216,10 @@ namespace PicoImageViewer.UI
                 _curvatureSlider.value = _curvature;
                 _curvatureSlider.onValueChanged.AddListener(OnCurvatureChanged);
             }
+            // Resize slider removed - resize is now via controller input
+            // (grip + trigger + thumbstick). Hide the slider if present.
             if (_resizeSlider != null)
-            {
-                _resizeSlider.minValue = 0.25f;
-                _resizeSlider.maxValue = 3f;
-                _resizeSlider.value = 1f;
-                _resizeSlider.onValueChanged.AddListener(OnResizeSliderChanged);
-            }
+                _resizeSlider.gameObject.SetActive(false);
 
             // Legacy buttons (still wired if present in prefab)
             if (_resetSizeButton != null)
@@ -500,11 +511,19 @@ namespace PicoImageViewer.UI
         {
             if (_curvature < 0.01f)
             {
-                // Flat: show RawImage, hide curved mesh
+                // Flat: show RawImage, hide curved mesh, restore control bar position
                 if (_imageDisplay != null)
                     _imageDisplay.gameObject.SetActive(true);
                 if (_curvedMeshGO != null)
                     _curvedMeshGO.SetActive(false);
+
+                // Restore control bar to original position
+                if (_controlBar != null)
+                {
+                    Vector3 cbPos = _controlBar.localPosition;
+                    cbPos.z = _controlBarOriginalZ;
+                    _controlBar.localPosition = cbPos;
+                }
                 return;
             }
 
@@ -517,6 +536,22 @@ namespace PicoImageViewer.UI
 
             if (_curvedMeshGO != null)
                 _curvedMeshGO.SetActive(true);
+
+            // Move control bar forward so it's not hidden behind the curved mesh.
+            // The curve extends toward the viewer at its edges; the control bar
+            // needs to be in front of the maximum forward extent of the curve.
+            if (_controlBar != null)
+            {
+                float canvasW = _currentWidth / _canvasScale;
+                float arcAngleRad = _curvature * Mathf.PI;
+                float radius = canvasW / arcAngleRad;
+                // Maximum forward extension at arc edges (in canvas units)
+                float maxForward = radius * (1f - Mathf.Cos(arcAngleRad * 0.5f));
+                // Push control bar in front of curve + margin
+                Vector3 cbPos = _controlBar.localPosition;
+                cbPos.z = -(maxForward + 30f);
+                _controlBar.localPosition = cbPos;
+            }
         }
 
         /// <summary>
@@ -550,8 +585,8 @@ namespace PicoImageViewer.UI
         }
 
         /// <summary>
-        /// Generate (or regenerate) the cylindrical curved mesh.
-        /// The mesh is in canvas-unit local space (child of the Canvas transform).
+        /// Generate (or regenerate) the cylindrical curved mesh covering the full
+        /// window area (image + control bar). The mesh is in canvas-unit local space.
         /// Curvature 0→1 maps to arc angle 0→180°.
         /// The mesh curves TOWARD the viewer (edges bend toward -Z).
         /// </summary>
@@ -561,11 +596,20 @@ namespace PicoImageViewer.UI
 
             float canvasW = _currentWidth / _canvasScale;
             float canvasH = _currentHeight / _canvasScale;
-            float arcAngleRad = _curvature * Mathf.PI; // 0 to π
 
+            // Include control bar height in the curved surface
+            float controlBarH = 0f;
+            if (_controlBar != null)
+                controlBarH = _controlBar.rect.height;
+            float totalH = canvasH + controlBarH;
+
+            float arcAngleRad = _curvature * Mathf.PI; // 0 to π
             if (arcAngleRad < 0.001f) return;
 
             float radius = canvasW / arcAngleRad;
+
+            // Image UV occupies the top portion, control bar area at bottom
+            float imageUVRatio = canvasH / totalH;
 
             var vertices = new Vector3[(CurveMeshSegments + 1) * 2];
             var uvs = new Vector2[(CurveMeshSegments + 1) * 2];
@@ -577,15 +621,14 @@ namespace PicoImageViewer.UI
                 float angle = (u - 0.5f) * arcAngleRad;
 
                 float px = radius * Mathf.Sin(angle);
-                // Z curves toward viewer (-Z). At center (angle=0): pz=0.
                 float pz = radius * (Mathf.Cos(angle) - 1f);
 
                 int vi = x * 2;
-                // Bottom vertex
-                vertices[vi] = new Vector3(px, -canvasH * 0.5f, pz);
+                // Bottom vertex (includes control bar area)
+                vertices[vi] = new Vector3(px, -totalH * 0.5f, pz);
                 uvs[vi] = new Vector2(u, 0f);
                 // Top vertex
-                vertices[vi + 1] = new Vector3(px, canvasH * 0.5f, pz);
+                vertices[vi + 1] = new Vector3(px, totalH * 0.5f, pz);
                 uvs[vi + 1] = new Vector2(u, 1f);
             }
 
@@ -593,7 +636,6 @@ namespace PicoImageViewer.UI
             {
                 int vi = x * 2;
                 int ti = x * 6;
-                // Two triangles per quad, wound so front face points toward viewer (-Z side)
                 triangles[ti + 0] = vi;
                 triangles[ti + 1] = vi + 1;
                 triangles[ti + 2] = vi + 2;
@@ -617,6 +659,60 @@ namespace PicoImageViewer.UI
             // Update texture on curved mesh material
             if (_curvedMeshMaterial != null && _imageDisplay != null && _imageDisplay.texture != null)
                 _curvedMeshMaterial.mainTexture = _imageDisplay.texture;
+        }
+
+        /// <summary>
+        /// Auto-discover the control bar RectTransform from child hierarchy.
+        /// </summary>
+        private void AutoDiscoverControlBar()
+        {
+            if (_controlBar != null) return;
+
+            // Search for common control bar names
+            string[] names = { "ControlBar", "ControllerBar", "Controls", "BottomBar" };
+            foreach (var name in names)
+            {
+                var found = FindChildRecursive(transform, name);
+                if (found != null)
+                {
+                    _controlBar = found.GetComponent<RectTransform>();
+                    if (_controlBar != null) break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Ensure the Canvas has a TrackedDeviceGraphicRaycaster for XR ray interaction.
+        /// Without this, XR controller rays cannot interact with Canvas UI buttons.
+        /// </summary>
+        private void EnsureXRGraphicRaycaster()
+        {
+            var canvas = GetComponent<Canvas>();
+            if (canvas == null) return;
+
+            // Check for TrackedDeviceGraphicRaycaster (XRI UI support)
+            var existingRaycaster = GetComponent<UnityEngine.XR.Interaction.Toolkit.UI.TrackedDeviceGraphicRaycaster>();
+            if (existingRaycaster == null)
+            {
+                // Remove any existing GraphicRaycaster that might conflict
+                var graphicRaycaster = GetComponent<GraphicRaycaster>();
+                if (graphicRaycaster != null)
+                    Destroy(graphicRaycaster);
+
+                gameObject.AddComponent<UnityEngine.XR.Interaction.Toolkit.UI.TrackedDeviceGraphicRaycaster>();
+            }
+        }
+
+        private static Transform FindChildRecursive(Transform parent, string name)
+        {
+            for (int i = 0; i < parent.childCount; i++)
+            {
+                var child = parent.GetChild(i);
+                if (child.name == name) return child;
+                var found = FindChildRecursive(child, name);
+                if (found != null) return found;
+            }
+            return null;
         }
 
         private void OnResizeSliderChanged(float value)

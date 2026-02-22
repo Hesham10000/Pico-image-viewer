@@ -22,6 +22,7 @@ namespace PicoImageViewer.UI
         [SerializeField] private Button _upButton;
         [SerializeField] private Button _backButton;
         [SerializeField] private Button _homeButton;
+        [SerializeField] private Button _closeButton;
         [SerializeField] private RectTransform _contentContainer;
         [SerializeField] private GameObject _folderItemPrefab;
         [SerializeField] private GameObject _imageItemPrefab;
@@ -67,6 +68,8 @@ namespace PicoImageViewer.UI
                 _backButton.onClick.AddListener(NavigateBack);
             if (_homeButton != null)
                 _homeButton.onClick.AddListener(NavigateHome);
+            if (_closeButton != null)
+                _closeButton.onClick.AddListener(ClosePanel);
 
             // Start at last browsed folder or root folder
             var settings = AppSettings.Load();
@@ -176,6 +179,13 @@ namespace PicoImageViewer.UI
                 var go = FindChildRecursive(header, "HomeButton");
                 if (go != null) _homeButton = go.GetComponent<Button>();
                 else _homeButton = CreateNavButton(header, "HomeButton", "Home", 2);
+            }
+
+            if (_closeButton == null)
+            {
+                var go = FindChildRecursive(header, "CloseButton");
+                if (go != null) _closeButton = go.GetComponent<Button>();
+                else _closeButton = CreateNavButton(header, "CloseButton", "X", 3);
             }
         }
 
@@ -569,10 +579,53 @@ namespace PicoImageViewer.UI
 
         /// <summary>
         /// Show or hide the browser panel.
+        /// When showing, repositions the panel in front of the user if it was hidden.
         /// </summary>
         public void SetVisible(bool visible)
         {
+            bool wasHidden = !gameObject.activeSelf;
             gameObject.SetActive(visible);
+
+            // Reposition in front of user when transitioning from hidden to visible
+            if (visible && wasHidden)
+            {
+                RepositionInFrontOfUser();
+            }
+        }
+
+        /// <summary>
+        /// Close (hide) the folder browser panel.
+        /// </summary>
+        public void ClosePanel()
+        {
+            gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// Position the panel in front of the user's current view direction.
+        /// Called when the panel is shown or when the user can't see it.
+        /// </summary>
+        public void RepositionInFrontOfUser()
+        {
+            Camera mainCam = Camera.main;
+            if (mainCam == null) return;
+
+            Vector3 forward = mainCam.transform.forward;
+            forward.y = 0f;
+            if (forward.sqrMagnitude < 0.01f) forward = Vector3.forward;
+            forward.Normalize();
+
+            float distance = 1.5f;
+            // Position slightly to the left so it doesn't overlap image windows
+            Vector3 right = Vector3.Cross(Vector3.up, forward).normalized;
+            Vector3 targetPos = mainCam.transform.position
+                + forward * distance
+                - right * 0.3f; // slight left offset
+
+            transform.position = targetPos;
+            transform.rotation = Quaternion.LookRotation(forward, Vector3.up);
+
+            Debug.Log($"[FolderBrowser] Repositioned in front of user at {targetPos}");
         }
 
         private void OnDestroy()
@@ -580,6 +633,7 @@ namespace PicoImageViewer.UI
             if (_upButton != null) _upButton.onClick.RemoveAllListeners();
             if (_backButton != null) _backButton.onClick.RemoveAllListeners();
             if (_homeButton != null) _homeButton.onClick.RemoveAllListeners();
+            if (_closeButton != null) _closeButton.onClick.RemoveAllListeners();
             ClearItems();
 
             if (Instance == this) Instance = null;

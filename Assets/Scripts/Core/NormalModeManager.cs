@@ -122,6 +122,9 @@ namespace PicoImageViewer.Core
 
             // Spawn window
             GameObject go = Instantiate(_imageWindowPrefab, _windowContainer);
+            // Ensure the window is active (prefab may be inactive in project)
+            go.SetActive(true);
+
             var window = go.GetComponent<ImageWindow>();
             if (window == null)
             {
@@ -131,6 +134,9 @@ namespace PicoImageViewer.Core
             }
 
             window.Initialize(imageData, width, height, position, rotation);
+
+            // Ensure window is visible
+            window.Show();
 
             // Attach sibling data for joystick cycling
             window.SetSiblingImages(siblingImages);
