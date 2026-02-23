@@ -585,10 +585,11 @@ namespace PicoImageViewer.UI
         }
 
         /// <summary>
-        /// Generate (or regenerate) the cylindrical curved mesh covering the full
-        /// window area (image + control bar). The mesh is in canvas-unit local space.
+        /// Generate (or regenerate) the cylindrical curved mesh for the image area.
+        /// The mesh is in canvas-unit local space (child of the Canvas transform).
         /// Curvature 0→1 maps to arc angle 0→180°.
         /// The mesh curves TOWARD the viewer (edges bend toward -Z).
+        /// The control bar is kept as flat Canvas UI with a forward offset.
         /// </summary>
         private void GenerateCurvedMesh()
         {
@@ -596,20 +597,11 @@ namespace PicoImageViewer.UI
 
             float canvasW = _currentWidth / _canvasScale;
             float canvasH = _currentHeight / _canvasScale;
-
-            // Include control bar height in the curved surface
-            float controlBarH = 0f;
-            if (_controlBar != null)
-                controlBarH = _controlBar.rect.height;
-            float totalH = canvasH + controlBarH;
-
             float arcAngleRad = _curvature * Mathf.PI; // 0 to π
+
             if (arcAngleRad < 0.001f) return;
 
             float radius = canvasW / arcAngleRad;
-
-            // Image UV occupies the top portion, control bar area at bottom
-            float imageUVRatio = canvasH / totalH;
 
             var vertices = new Vector3[(CurveMeshSegments + 1) * 2];
             var uvs = new Vector2[(CurveMeshSegments + 1) * 2];
@@ -621,14 +613,15 @@ namespace PicoImageViewer.UI
                 float angle = (u - 0.5f) * arcAngleRad;
 
                 float px = radius * Mathf.Sin(angle);
+                // Z curves toward viewer (-Z). At center (angle=0): pz=0.
                 float pz = radius * (Mathf.Cos(angle) - 1f);
 
                 int vi = x * 2;
-                // Bottom vertex (includes control bar area)
-                vertices[vi] = new Vector3(px, -totalH * 0.5f, pz);
+                // Bottom vertex
+                vertices[vi] = new Vector3(px, -canvasH * 0.5f, pz);
                 uvs[vi] = new Vector2(u, 0f);
                 // Top vertex
-                vertices[vi + 1] = new Vector3(px, totalH * 0.5f, pz);
+                vertices[vi + 1] = new Vector3(px, canvasH * 0.5f, pz);
                 uvs[vi + 1] = new Vector2(u, 1f);
             }
 
@@ -636,6 +629,7 @@ namespace PicoImageViewer.UI
             {
                 int vi = x * 2;
                 int ti = x * 6;
+                // Two triangles per quad, wound so front face points toward viewer (-Z side)
                 triangles[ti + 0] = vi;
                 triangles[ti + 1] = vi + 1;
                 triangles[ti + 2] = vi + 2;

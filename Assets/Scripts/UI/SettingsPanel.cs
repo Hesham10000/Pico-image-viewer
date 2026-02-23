@@ -337,8 +337,13 @@ namespace PicoImageViewer.UI
 
             if (_settings.Mode == ViewMode.Normal)
             {
-                // In Normal mode, navigate the FolderBrowserPanel
-                FolderBrowserPanel.Instance?.NavigateTo(path);
+                // In Normal mode, ensure the folder browser is visible and navigate
+                var browser = FolderBrowserPanel.Instance;
+                if (browser != null)
+                {
+                    browser.SetVisible(true);
+                    browser.NavigateTo(path);
+                }
                 UpdateStatus($"Browsing: {path}");
             }
             else

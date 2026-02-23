@@ -84,8 +84,15 @@ namespace PicoImageViewer.Core
             // Angular step per image: how many radians each image+spacing occupies on the arc
             float arcPerImage = 2f * Mathf.Atan2((windowW + colSpacing) * 0.5f, radius);
 
+            // Effective row height: window height + extra padding for title bar and
+            // control bar that may extend beyond the base canvas dimensions.
+            // The prefab has a 40-unit title bar + 35-unit control bar = 75 units overhead
+            // at 0.001 scale = 0.075m. Add this as padding to prevent row overlap.
+            float controlBarPadding = 0.075f * _settings.WindowScaleMultiplier;
+            float effectiveRowH = windowH + controlBarPadding;
+
             Debug.Log($"[GridLayout] Curved arc: radius={radius}, arcPerImage={arcPerImage * Mathf.Rad2Deg}°, " +
-                      $"windowSize={windowW}x{windowH}, head={headPos}");
+                      $"windowSize={windowW}x{windowH}, effectiveRowH={effectiveRowH}, head={headPos}");
 
             for (int r = 0; r < folders.Count; r++)
             {
@@ -97,7 +104,7 @@ namespace PicoImageViewer.Core
                 float startAngle = -totalArcAngle * 0.5f;
 
                 // Row Y position: eye level + up offset, then step down per row
-                float yPos = headPos.y + _settings.GridUpOffset - r * (windowH + rowSpacing);
+                float yPos = headPos.y + _settings.GridUpOffset - r * (effectiveRowH + rowSpacing);
 
                 for (int c = 0; c < imageCount; c++)
                 {
@@ -149,7 +156,9 @@ namespace PicoImageViewer.Core
             float startAngle = -totalArcAngle * 0.5f;
             float angle = startAngle + col * arcPerImage;
 
-            float yPos = headPos.y + _settings.GridUpOffset - row * (windowH + _settings.RowSpacing);
+            float controlBarPadding = 0.075f * _settings.WindowScaleMultiplier;
+            float effectiveRowH = windowH + controlBarPadding;
+            float yPos = headPos.y + _settings.GridUpOffset - row * (effectiveRowH + _settings.RowSpacing);
 
             Quaternion arcRot = Quaternion.AngleAxis(angle * Mathf.Rad2Deg, Vector3.up);
             Vector3 dir = arcRot * forward;

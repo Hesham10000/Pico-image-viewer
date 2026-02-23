@@ -1,6 +1,8 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using PicoImageViewer.Android;
 using PicoImageViewer.Data;
+using PicoImageViewer.Interaction;
 using PicoImageViewer.UI;
 
 namespace PicoImageViewer.Core
@@ -111,10 +113,70 @@ namespace PicoImageViewer.Core
             if (_folderBrowserPanel == null)
                 _folderBrowserPanel = FindAnyObjectByType<FolderBrowserPanel>();
 
+            // Ensure interaction components exist
+            EnsureInteractionComponents();
+
+            // Ensure XR UI Input Module exists (required for XR ray → Canvas UI interaction)
+            EnsureXRUIInputModule();
+
             Debug.Log($"[AppBootstrap] Auto-discovered references: " +
                       $"Camera={_headCamera != null}, WindowMgr={_windowManager != null}, " +
                       $"NormalMgr={_normalModeManager != null}, TextureLoader={_textureLoader != null}, " +
                       $"Settings={_settingsPanel != null}, FolderBrowser={_folderBrowserPanel != null}");
+        }
+
+        /// <summary>
+        /// Ensure interaction handler components exist in the scene.
+        /// Creates them at runtime if they weren't placed in the scene via SceneSetup.
+        /// </summary>
+        private void EnsureInteractionComponents()
+        {
+            // ControllerResizeHandler: grip + trigger + thumbstick to resize windows
+            if (FindAnyObjectByType<ControllerResizeHandler>() == null)
+            {
+                var go = new GameObject("ControllerResizeHandler");
+                go.transform.SetParent(transform.parent, false);
+                go.AddComponent<ControllerResizeHandler>();
+                Debug.Log("[AppBootstrap] Auto-created ControllerResizeHandler");
+            }
+
+            // JoystickImageNavigator: thumbstick to cycle images
+            if (FindAnyObjectByType<JoystickImageNavigator>() == null)
+            {
+                var go = new GameObject("JoystickImageNavigator");
+                go.transform.SetParent(transform.parent, false);
+                go.AddComponent<JoystickImageNavigator>();
+                Debug.Log("[AppBootstrap] Auto-created JoystickImageNavigator");
+            }
+        }
+
+        /// <summary>
+        /// Ensure an XR UI Input Module exists so that XR rays can interact with
+        /// Canvas UI elements (buttons, sliders). Without this, the
+        /// TrackedDeviceGraphicRaycaster on canvases won't receive input events.
+        /// </summary>
+        private void EnsureXRUIInputModule()
+        {
+            // Check for any existing EventSystem
+            var eventSystem = FindAnyObjectByType<EventSystem>();
+            if (eventSystem == null)
+            {
+                var go = new GameObject("EventSystem");
+                go.transform.SetParent(transform.parent, false);
+                eventSystem = go.AddComponent<EventSystem>();
+            }
+
+            // Replace standard InputModule with XR UI Input Module if needed
+            var xrInputModule = eventSystem.GetComponent<UnityEngine.XR.Interaction.Toolkit.UI.XRUIInputModule>();
+            if (xrInputModule == null)
+            {
+                // Remove standard input modules that conflict
+                var standaloneInput = eventSystem.GetComponent<StandaloneInputModule>();
+                if (standaloneInput != null) Destroy(standaloneInput);
+
+                eventSystem.gameObject.AddComponent<UnityEngine.XR.Interaction.Toolkit.UI.XRUIInputModule>();
+                Debug.Log("[AppBootstrap] Added XRUIInputModule to EventSystem");
+            }
         }
 
         private void RequestPermissionsAndInit()

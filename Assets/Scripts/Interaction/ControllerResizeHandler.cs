@@ -19,8 +19,8 @@ namespace PicoImageViewer.Interaction
     {
         [Header("Settings")]
         [SerializeField] private float _resizeSpeed = 0.8f;
-        [SerializeField] private float _gripThreshold = 0.5f;
-        [SerializeField] private float _triggerThreshold = 0.5f;
+        [SerializeField] private float _gripThreshold = 0.3f;
+        [SerializeField] private float _triggerThreshold = 0.3f;
         [SerializeField] private float _thumbstickDeadzone = 0.3f;
 
         [Header("Ray Detection")]
