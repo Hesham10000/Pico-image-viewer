@@ -1,3 +1,4 @@
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -107,7 +108,10 @@ namespace PicoImageViewer.Core
 
             // Create texture on main thread
             Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, true);
-            tex.filterMode = FilterMode.Bilinear;
+    
+            // Use Trilinear + Anisotropic to kill the shiny aliasing in VR!
+            tex.filterMode = FilterMode.Trilinear;
+            tex.anisoLevel = 8; 
             tex.wrapMode = TextureWrapMode.Clamp;
 
             if (!tex.LoadImage(fileBytes))
@@ -148,7 +152,15 @@ namespace PicoImageViewer.Core
 
             Graphics.Blit(source, rt);
 
+            // 1. Create the final resized texture WITH mipmaps (true)
             Texture2D result = new Texture2D(newWidth, newHeight, TextureFormat.RGBA32, true);
+    
+            // 2. Apply the exact same VR filters to the resized version
+            result.filterMode = FilterMode.Trilinear;
+            result.anisoLevel = 8;
+            result.wrapMode = TextureWrapMode.Clamp;
+
+            // 3. Read the pixels and tell Apply to generate the mipmaps (true)
             result.ReadPixels(new Rect(0, 0, newWidth, newHeight), 0, 0);
             result.Apply(true);
 
