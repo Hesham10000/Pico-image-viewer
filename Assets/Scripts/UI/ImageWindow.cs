@@ -79,6 +79,7 @@ namespace PicoImageViewer.UI
 
         // Original control bar Z position (for restoring when curvature is removed)
         private float _controlBarOriginalZ;
+        private float _titleBarOriginalZ;
 
         // Resize scale multiplier driven by the resize slider (0.5 = half, 1 = default, 2 = double)
         private float _resizeScale = 1f;
@@ -139,9 +140,11 @@ namespace PicoImageViewer.UI
             // Auto-discover control bar if not assigned
             AutoDiscoverControlBar();
 
-            // Store original control bar position for curvature reset
+            // Store original bar positions for curvature reset
             if (_controlBar != null)
                 _controlBarOriginalZ = _controlBar.localPosition.z;
+            if (_titleBar != null)
+                _titleBarOriginalZ = _titleBar.localPosition.z;
 
             // Ensure Canvas has TrackedDeviceGraphicRaycaster for XR interaction
             EnsureXRGraphicRaycaster();
@@ -511,19 +514,15 @@ namespace PicoImageViewer.UI
         {
             if (_curvature < 0.01f)
             {
-                // Flat: show RawImage, hide curved mesh, restore control bar position
+                // Flat: show RawImage, hide curved mesh, restore bar positions
                 if (_imageDisplay != null)
                     _imageDisplay.gameObject.SetActive(true);
                 if (_curvedMeshGO != null)
                     _curvedMeshGO.SetActive(false);
 
-                // Restore control bar to original position
-                if (_controlBar != null)
-                {
-                    Vector3 cbPos = _controlBar.localPosition;
-                    cbPos.z = _controlBarOriginalZ;
-                    _controlBar.localPosition = cbPos;
-                }
+                // Restore bars to original positions
+                RestoreBarPosition(_controlBar, _controlBarOriginalZ);
+                RestoreBarPosition(_titleBar, _titleBarOriginalZ);
                 return;
             }
 
@@ -537,21 +536,34 @@ namespace PicoImageViewer.UI
             if (_curvedMeshGO != null)
                 _curvedMeshGO.SetActive(true);
 
-            // Move control bar forward so it's not hidden behind the curved mesh.
-            // The curve extends toward the viewer at its edges; the control bar
-            // needs to be in front of the maximum forward extent of the curve.
-            if (_controlBar != null)
-            {
-                float canvasW = _currentWidth / _canvasScale;
-                float arcAngleRad = _curvature * Mathf.PI;
-                float radius = canvasW / arcAngleRad;
-                // Maximum forward extension at arc edges (in canvas units)
-                float maxForward = radius * (1f - Mathf.Cos(arcAngleRad * 0.5f));
-                // Push control bar in front of curve + margin
-                Vector3 cbPos = _controlBar.localPosition;
-                cbPos.z = -(maxForward + 30f);
-                _controlBar.localPosition = cbPos;
-            }
+            // Move title bar and control bar forward so they float in front of
+            // the curved mesh. This is the standard VR pattern: curved content
+            // with flat floating UI bars (like YouTube VR, Netflix VR).
+            float canvasW = _currentWidth / _canvasScale;
+            float arcAngleRad = _curvature * Mathf.PI;
+            float radius = canvasW / arcAngleRad;
+            // Maximum forward extension at arc edges (in canvas units)
+            float maxForward = radius * (1f - Mathf.Cos(arcAngleRad * 0.5f));
+            float forwardZ = -(maxForward + 20f);
+
+            PushBarForward(_controlBar, forwardZ);
+            PushBarForward(_titleBar, forwardZ);
+        }
+
+        private static void PushBarForward(RectTransform bar, float z)
+        {
+            if (bar == null) return;
+            Vector3 pos = bar.localPosition;
+            pos.z = z;
+            bar.localPosition = pos;
+        }
+
+        private static void RestoreBarPosition(RectTransform bar, float originalZ)
+        {
+            if (bar == null) return;
+            Vector3 pos = bar.localPosition;
+            pos.z = originalZ;
+            bar.localPosition = pos;
         }
 
         /// <summary>
